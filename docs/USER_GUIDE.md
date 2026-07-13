@@ -45,9 +45,18 @@ installed in the same environment.
 
 ### macOS, Linux, and WSL2
 
-From the repository root:
+Install the released CLI directly from GitHub:
 
 ```bash
+python -m pip install "git+https://github.com/ZHULUYI-KyushuU/ppi-scout.git@v0.4.0"
+```
+
+To use the repository-scoped Codex Skill or contribute to the project, clone
+the repository and install from its root:
+
+```bash
+git clone https://github.com/ZHULUYI-KyushuU/ppi-scout.git
+cd ppi-scout
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip

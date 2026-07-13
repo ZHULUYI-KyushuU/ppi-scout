@@ -50,10 +50,19 @@ significantly slower than GPU execution.
 
 ## Installation
 
-Clone this repository or download its source archive, then create an isolated
-environment from the repository root:
+Install the released CLI directly from GitHub:
 
 ```bash
+python -m pip install "git+https://github.com/ZHULUYI-KyushuU/ppi-scout.git@v0.4.0"
+```
+
+For repository-scoped Codex Skill support, clone or download the complete
+source repository instead. Then create an isolated environment from the
+repository root:
+
+```bash
+git clone https://github.com/ZHULUYI-KyushuU/ppi-scout.git
+cd ppi-scout
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
