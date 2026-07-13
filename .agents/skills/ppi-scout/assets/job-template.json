@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "name": "replace-with-job-name",
+  "language": "en",
+  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "inputs": {
+    "organism": "replace-with-organism-or-strain",
+    "proteins": [
+      {
+        "id": "A",
+        "name": "replace-with-protein-a",
+        "sequence": "",
+        "source": "accession, FASTA path, or direct sequence"
+      },
+      {
+        "id": "B",
+        "name": "replace-with-protein-b",
+        "sequence": "",
+        "source": "accession, FASTA path, or direct sequence"
+      }
+    ]
+  },
+  "routing": {
+    "route": "needs_review",
+    "confidence": "low",
+    "reasons": [],
+    "warnings": [
+      "Replace placeholders by running ppi-scout plan; do not run this template directly."
+    ],
+    "selected_region": null,
+    "selected_motif": null,
+    "coordinate_convention": "1-based inclusive"
+  },
+  "hypothesis": {
+    "motif_owner": null,
+    "motif_sequence": null,
+    "motif_region": null,
+    "motif_context": null,
+    "receptor_has_motif_pocket": null,
+    "coordinate_convention": "1-based inclusive"
+  },
+  "peptide_design": {
+    "enabled": false,
+    "windows": [
+      16,
+      24,
+      34
+    ],
+    "seed": 7,
+    "variants": []
+  },
+  "execution": {
+    "backend": "boltz2",
+    "status": "planned",
+    "remote_msa": false,
+    "msa_mode": "single_sequence",
+    "output_format": "pdb",
+    "extra_args": []
+  },
+  "privacy": {
+    "local_first": true,
+    "sequence_upload_authorized": false,
+    "sequences_public": false,
+    "external_data_flow": [],
+    "notes": "Public MSA services can receive submitted protein sequences."
+  }
+}

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ppi-scout"
+version = "0.4.0"
+description = "A multilingual local workflow for planning protein interaction predictions."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "PPI Scout contributors" },
+]
+dependencies = []
+
+[project.optional-dependencies]
+yaml = ["PyYAML>=6.0"]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+ppi-scout = "ppi_scout.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.data-files]
+"share/ppi-scout/locales" = [
+  "locales/zh-CN.json",
+  "locales/en.json",
+  "locales/ja.json",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "name": "atg8-atg19-public-demo",
+  "language": "en",
+  "created_at": "2026-07-13T09:36:17.049379+00:00",
+  "inputs": {
+    "organism": "Saccharomyces cerevisiae S288c",
+    "proteins": [
+      {
+        "id": "A",
+        "name": "atg8-scer-p38182",
+        "sequence": "MKSTFKSEYPFEKRKAESERIADRFKNRIPVICEKAEKSDIPEIDKRKYLVPADLTVGQFVYVIRKRIMLPPEKAIFIFVNDTLPPTAALMSAIYQEHKDKDGFLYVTYSGENTFGR",
+        "source": "fasta",
+        "source_path": "examples/atg8-scer-p38182.fasta"
+      },
+      {
+        "id": "B",
+        "name": "atg19-scer-p35193",
+        "sequence": "MNNSKTNQQMNTSMGYPLTVYDECNKFQLIVPTLDANIMLWCIGQLSLLNDSNGCKHLFWQPNDKSNVRILLNNYDYGHLFKYLQCQRKCSVYIGEGTLKKYNLTISTSFDNFLDLTPSEEKESLCREDAHEDPVSPKAGSEEEISPNSTSNVVVSRECLDNFMKQLLKLEESLNKLELEQKVTNKEPNHRISGTIDIPEDRSELVNFFTELKTVKQLEDVFQRYHDYERLSQECDSKTEIASDHSKKETKIEVEPPNERSLQITMNQRDNSLYFQLFNNTNSVLAGNCKLKFTDAGDKPTTQIIDMGPHEIGIKEYKEYRYFPYALDLEAGSTIEIENQYGEVIFLGKYGSSPMINLRPPSRLSAESLQASQEPFYSFQIDTLPELDDSSIISTSISLSYDGDDNEKALTWEEL",
+        "source": "fasta",
+        "source_path": "examples/atg19-scer-p35193.fasta"
+      }
+    ]
+  },
+  "routing": {
+    "route": "motif_peptide",
+    "confidence": "high",
+    "reasons": [
+      "A localized motif hypothesis is available.",
+      "The receptor has a corresponding motif-binding pocket.",
+      "The motif is predicted to be accessible or disordered."
+    ],
+    "warnings": [],
+    "selected_region": [
+      412,
+      415
+    ],
+    "selected_motif": "WEEL"
+  },
+  "hypothesis": {
+    "motif_owner": "B",
+    "motif_sequence": "WEEL",
+    "motif_region": [
+      412,
+      415
+    ],
+    "motif_context": "exposed",
+    "receptor_has_motif_pocket": true,
+    "coordinate_convention": "1-based inclusive"
+  },
+  "peptide_design": null,
+  "execution": {
+    "backend": "boltz2",
+    "status": "planned",
+    "remote_msa": false
+  },
+  "privacy": {
+    "local_first": true,
+    "sequence_upload_authorized": false
+  }
+}
