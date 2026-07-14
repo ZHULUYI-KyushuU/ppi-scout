@@ -228,6 +228,8 @@ PPI Scout reports structural-model evidence, not experimental binding.
 ## Documentation
 
 - [User Guide](docs/USER_GUIDE.md)
+- [Official HelixFold3 cloud execution](docs/HELIXFOLD3_CLOUD.md)
+- [HelixFold3 Codex handoff](docs/HELIXFOLD3_CODEX_HANDOFF.md)
 - [Example Workflows](examples/README.md)
 - CLI reference: `ppi-scout --help`
 - Boltz upstream documentation:

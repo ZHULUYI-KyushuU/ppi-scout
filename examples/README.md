@@ -42,3 +42,17 @@ selection requires biological evidence rather than automatic rank selection.
 The HTML output is self-contained and opens locally without a server. This
 example demonstrates planning and peptide design; it does not run Boltz or
 generate a new binding claim.
+
+## HelixFold3 Atg8–Yta7 control panel
+
+`helixfold3-yta7-panel.json` is a separate, exact five-job manifest for an
+explicitly authorized official PaddleHelix HelixFold3 cloud run. Validate its
+fixed sequences and controls before any submission:
+
+```bash
+python scripts/validate_helixfold3_panel.py examples/helixfold3-yta7-panel.json
+```
+
+Follow [the official-cloud guide](../docs/HELIXFOLD3_CLOUD.md). Each variant is
+an independent two-protein task; the five peptides must never be combined into
+one complex.

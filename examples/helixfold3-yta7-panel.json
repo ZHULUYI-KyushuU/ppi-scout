@@ -1,0 +1,167 @@
+{
+  "format": "ppi-scout.helixfold3-cloud-panel.v1",
+  "panel_id": "scer-atg8-yta7-40-63-controls",
+  "title": "Saccharomyces cerevisiae Atg8–Yta7 motif-peptide control panel",
+  "provider": {
+    "name": "PaddleHelix",
+    "service": "HelixFold3",
+    "server_url": "https://paddlehelix.baidu.com/app/all/helixfold3/forecast",
+    "model_policy": "newest stable production HelixFold3 model available at submission time",
+    "minimum_model": "HelixFold3.2",
+    "submission_mode": "authenticated_official_web_or_documented_official_paid_api"
+  },
+  "data_governance": {
+    "classification": "public_reference_sequences",
+    "remote_submission_authorization": "must_be_confirmed_by_the_operator_at_execution_time",
+    "allowed_provider": "PaddleHelix official HelixFold3 service only",
+    "credentials_permitted_in_manifest": false
+  },
+  "design": {
+    "organism": "Saccharomyces cerevisiae S288c",
+    "question": "Does Yta7 residues 40-63 form a specific AIM/LIR-like pose in the canonical Atg8 binding groove?",
+    "motif_owner": "B",
+    "candidate_registers": [
+      {
+        "label": "YAEI",
+        "yta7_coordinates_1_based_inclusive": "46:49"
+      },
+      {
+        "label": "FDFL",
+        "yta7_coordinates_1_based_inclusive": "53:56"
+      }
+    ],
+    "independent_job_required_for_each_variant": true,
+    "combine_variants_in_one_complex": false
+  },
+  "entity_a": {
+    "requested_chain_label": "A",
+    "role": "receptor_reference",
+    "name": "Atg8",
+    "uniprot_accession": "P38182",
+    "sequence_source": "UniProtKB reviewed public record",
+    "sequence": "MKSTFKSEYPFEKRKAESERIADRFKNRIPVICEKAEKSDIPEIDKRKYLVPADLTVGQFVYVIRKRIMLPPEKAIFIFVNDTLPPTAALMSAIYQEHKDKDGFLYVTYSGENTFGR",
+    "length": 117,
+    "sha256": "06254f6852b1b1dfc3c6916b19e20fb0272536cf45cfd125418c976aba2782ce"
+  },
+  "jobs": [
+    {
+      "id": "yta7-atg8-wt",
+      "variant": "wt",
+      "hypothesis_role": "wild_type",
+      "entity_b": {
+        "requested_chain_label": "B",
+        "role": "motif_bearing_candidate",
+        "name": "Yta7 residues 40-63",
+        "uniprot_accession": "P40340",
+        "coordinates_1_based_inclusive": "40:63",
+        "sequence": "SLRKINYAEIEKVFDFLEDDQVMD",
+        "length": 24,
+        "sha256": "b9761a62123d129167e43d60975acc3e21e2fc100c371b621babc79c96be5df7"
+      },
+      "receipt": {
+        "status": "not_submitted",
+        "provider_job_id": null,
+        "result_url": null,
+        "model_label": null,
+        "submitted_at": null
+      }
+    },
+    {
+      "id": "yta7-atg8-yaei-anchor-mut",
+      "variant": "yaei_anchor_mutant",
+      "hypothesis_role": "matched_negative_control",
+      "entity_b": {
+        "requested_chain_label": "B",
+        "role": "motif_bearing_candidate_control",
+        "name": "Yta7 residues 40-63 YAEI anchor mutant",
+        "parent_accession": "P40340",
+        "parent_coordinates_1_based_inclusive": "40:63",
+        "mutation_description": "Y46A and I49A within the peptide window",
+        "sequence": "SLRKINAAEAEKVFDFLEDDQVMD",
+        "length": 24,
+        "sha256": "966d3c60e362aaddcb08d4053b21fdbb0e1f59f0be3861934de2df1030ab2b99"
+      },
+      "receipt": {
+        "status": "not_submitted",
+        "provider_job_id": null,
+        "result_url": null,
+        "model_label": null,
+        "submitted_at": null
+      }
+    },
+    {
+      "id": "yta7-atg8-fdfl-anchor-mut",
+      "variant": "fdfl_anchor_mutant",
+      "hypothesis_role": "matched_negative_control",
+      "entity_b": {
+        "requested_chain_label": "B",
+        "role": "motif_bearing_candidate_control",
+        "name": "Yta7 residues 40-63 FDFL anchor mutant",
+        "parent_accession": "P40340",
+        "parent_coordinates_1_based_inclusive": "40:63",
+        "mutation_description": "F53A and L56A within the peptide window",
+        "sequence": "SLRKINYAEIEKVADFAEDDQVMD",
+        "length": 24,
+        "sha256": "09ada9543cdbef3965cdbfcc5b5f83ae2582ead889ffe90e32c91cc73afafb5d"
+      },
+      "receipt": {
+        "status": "not_submitted",
+        "provider_job_id": null,
+        "result_url": null,
+        "model_label": null,
+        "submitted_at": null
+      }
+    },
+    {
+      "id": "yta7-atg8-double-anchor-mut",
+      "variant": "double_anchor_mutant",
+      "hypothesis_role": "matched_negative_control",
+      "entity_b": {
+        "requested_chain_label": "B",
+        "role": "motif_bearing_candidate_control",
+        "name": "Yta7 residues 40-63 double anchor mutant",
+        "parent_accession": "P40340",
+        "parent_coordinates_1_based_inclusive": "40:63",
+        "mutation_description": "Y46A, I49A, F53A, and L56A within the peptide window",
+        "sequence": "SLRKINAAEAEKVADFAEDDQVMD",
+        "length": 24,
+        "sha256": "407f157a18caa5ca0096f27a943570551eaeba93088d29c13c6aad021b3a2b4e"
+      },
+      "receipt": {
+        "status": "not_submitted",
+        "provider_job_id": null,
+        "result_url": null,
+        "model_label": null,
+        "submitted_at": null
+      }
+    },
+    {
+      "id": "yta7-atg8-composition-scramble",
+      "variant": "composition_scramble",
+      "hypothesis_role": "composition_matched_negative_control",
+      "entity_b": {
+        "requested_chain_label": "B",
+        "role": "motif_bearing_candidate_control",
+        "name": "Yta7 residues 40-63 composition-matched scramble",
+        "parent_accession": "P40340",
+        "parent_coordinates_1_based_inclusive": "40:63",
+        "mutation_description": "deterministic composition-preserving permutation",
+        "sequence": "DYFNSDDKIQDKEVRLIMELEFVA",
+        "length": 24,
+        "sha256": "2ffc856c29d6091d411dcf595a14be88737120781fc405445a999aaf5f197831"
+      },
+      "receipt": {
+        "status": "not_submitted",
+        "provider_job_id": null,
+        "result_url": null,
+        "model_label": null,
+        "submitted_at": null
+      }
+    }
+  ],
+  "interpretation": {
+    "expected_interface": "canonical Atg8 AIM/LIR-binding groove",
+    "required_comparison": "WT versus both single-anchor mutants, double-anchor mutant, and composition-matched scramble under one exact provider model and matched settings",
+    "guardrail": "Provider confidence and a plausible pose are structural-model support, not proof of binding, affinity, or biological function."
+  }
+}

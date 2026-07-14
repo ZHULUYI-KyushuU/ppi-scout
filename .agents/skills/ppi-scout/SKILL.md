@@ -1,6 +1,6 @@
 ---
 name: ppi-scout
-description: Plan, execute, resume, and conservatively interpret reproducible local Boltz protein-complex and motif-peptide screens. Use when a user supplies protein names, accessions, FASTA files, or amino-acid sequences and needs sequence resolution, optional AIM/LIR candidate scanning, full-length/domain/motif-peptide routing, peptide and control design, a PPI Scout job file, local prediction, legacy-result import, analysis, an offline HTML result view, or a Chinese, English, or Japanese report.
+description: Plan, execute, resume, and conservatively interpret reproducible local Boltz protein-complex and motif-peptide screens or explicitly authorized official PaddleHelix HelixFold3 cloud panels. Use when a user supplies protein names, accessions, FASTA files, amino-acid sequences, or a HelixFold3 cloud manifest and needs sequence resolution, optional AIM/LIR candidate scanning, full-length/domain/motif-peptide routing, peptide and control design, local prediction, authorized official-cloud submission, legacy-result import, analysis, an offline HTML result view, or a Chinese, English, or Japanese report.
 ---
 
 # PPI Scout
@@ -54,6 +54,15 @@ ppi-scout analyze runs/atg8-atg19
 ppi-scout --lang zh-CN report runs/atg8-atg19 -o runs/atg8-atg19/report.md
 # runs/atg8-atg19/report.html is attempted automatically after both run commands
 ```
+
+## Run an authorized official HelixFold3 cloud panel
+
+For an explicitly requested PaddleHelix HelixFold3 cloud workflow, read
+[helixfold3-cloud.md](references/helixfold3-cloud.md) before validating inputs,
+opening the provider page, submitting jobs, monitoring, downloading, or
+reporting. Treat the supplied manifest as the exact submission boundary. Do
+not silently convert a local Boltz plan into a remote submission or substitute
+another provider or model.
 
 For a sequence-resolved motif hypothesis, record its owner, coordinates, and
 context in the plan rather than leaving them only in chat:
