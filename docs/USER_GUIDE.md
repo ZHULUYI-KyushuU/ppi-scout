@@ -275,6 +275,22 @@ different sequence, window, seed, MSA mode, or backend setting requires a new
 output directory. The default MSA mode is `msa: empty`; add `--remote-msa` only
 when sequence upload has been explicitly authorized.
 
+For a completely local reusable MSA library, name each A3M with the SHA-256 of
+its exact normalized receptor sequence and pass the directory:
+
+```bash
+ppi-scout run-panel job.json \
+  --msa-library msas \
+  --output-dir runs/receptor-motif-panel \
+  --live
+```
+
+PPI Scout validates the first/query A3M sequence before use. The receptor MSA
+is shared across every WT/control task, peptide chains remain `msa: empty`, and
+a missing exact match falls back to offline single-sequence mode without a
+remote request. Use `python -m ppi_scout.offline` instead of `ppi-scout` to
+add a process-wide Python network deny policy for portable execution.
+
 ## Representation selection
 
 Use `--mode auto` unless a representation is already supported by structural

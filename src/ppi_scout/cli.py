@@ -22,6 +22,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from . import __version__
 from .i18n import SUPPORTED_LANGUAGES, Translator, choose_language, normalize_language
+from .msa_library import LocalMSAResolution, resolve_receptor_msa
 
 
 ROUTES = ("auto", "full-length", "domain", "motif-peptide")
@@ -960,11 +961,37 @@ def _command_run_panel(args: argparse.Namespace, translator: Translator) -> int:
     )
 
     receptor_msa: str | None = None
+    msa_resolution: LocalMSAResolution | None = None
     if args.receptor_msa:
         msa_path = Path(args.receptor_msa).expanduser().resolve()
         if not msa_path.is_file():
             raise CLIError(f"Local receptor MSA file does not exist: {msa_path}")
         receptor_msa = str(msa_path)
+    elif args.msa_library:
+        receptor = next(
+            (item for item in proteins if str(item.get("id", "")).upper() != motif_owner),
+            None,
+        )
+        if receptor is None or not receptor.get("sequence"):
+            raise CLIError("run-panel requires an exact receptor sequence for MSA lookup.")
+        try:
+            msa_resolution = resolve_receptor_msa(
+                Path(args.msa_library),
+                str(receptor["sequence"]),
+            )
+        except (OSError, ValueError) as exc:
+            raise CLIError(str(exc)) from exc
+        if msa_resolution.path is not None:
+            receptor_msa = str(msa_resolution.path)
+            print(
+                f"Using exact local receptor MSA: {msa_resolution.path}",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "No exact local receptor MSA was found; using offline single-sequence mode.",
+                file=sys.stderr,
+            )
 
     try:
         backend_module = importlib.import_module("ppi_scout.backends.boltz2")
@@ -994,6 +1021,14 @@ def _command_run_panel(args: argparse.Namespace, translator: Translator) -> int:
         )
     except (TypeError, ValueError) as exc:
         raise CLIError(str(exc)) from exc
+
+    if msa_resolution is not None:
+        manifest["msa"]["library_lookup"] = msa_resolution.to_dict()
+        if not msa_resolution.matched:
+            manifest["warnings"].append(
+                "No exact sequence-addressed receptor MSA was found in the local library; "
+                "the panel uses offline single-sequence mode."
+            )
 
     output_dir = Path(
         args.output_dir or f"runs/{_safe_job_slug(job.get('name'))}-panel"
@@ -1475,6 +1510,13 @@ def build_parser() -> argparse.ArgumentParser:
     msa_mode.add_argument(
         "--receptor-msa",
         help="Audited local/precomputed receptor MSA path; peptides remain msa: empty.",
+    )
+    msa_mode.add_argument(
+        "--msa-library",
+        help=(
+            "Offline A3M directory addressed by exact receptor sequence SHA-256; "
+            "falls back to msa: empty when no exact match exists."
+        ),
     )
     panel.add_argument("--output-format", choices=("pdb", "mmcif"), default="pdb")
     panel.add_argument("--accelerator", choices=("auto", "gpu", "cpu", "tpu"), default="auto")

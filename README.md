@@ -37,6 +37,8 @@ confidence as experimental evidence of binding.
   with one `run-panel` command.
 - Collect confidence fields and generate Markdown and self-contained HTML
   reports.
+- Run through a hard-offline entry point that blocks Python IPv4/IPv6 access,
+  refuses remote MSA, and supports exact-sequence local receptor MSA lookup.
 - Provide Chinese, English, and Japanese interactive prompts.
 
 ## Requirements
@@ -111,6 +113,22 @@ boltz predict --help
 `ready_to_plan: true` confirms that the PPI Scout planning stack is available.
 `ready_to_run: true` additionally confirms that the Boltz executable is
 discoverable.
+
+## Completely offline bundles
+
+The portable release design packages pinned macOS arm64 and Linux x86_64/WSL2
+runtimes, the Boltz model payload, an Ubuntu WSL root filesystem, launchers,
+checksums, and a reviewed job. The one-time setup downloads and verifies every
+GitHub Release part. All later inference runs use:
+
+```bash
+python -m ppi_scout.offline ...
+```
+
+This entry point rejects `--remote-msa`, enables upstream offline environment
+flags, and blocks Python IPv4/IPv6 sockets while preserving local IPC. See
+[`portable/README.md`](portable/README.md) for the bundle layout and Windows
+WSL2 prerequisites.
 
 ## Codex integration
 

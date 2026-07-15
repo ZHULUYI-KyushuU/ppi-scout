@@ -1,0 +1,77 @@
+name: Build offline runtimes
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    name: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS arm64
+            os: macos-14
+            archive: cpython-3.12.13+20260623-aarch64-apple-darwin-install_only.tar.gz
+            python_sha256: 3724aa4dafb5f7b6c2cf98e89914e4248dc6bd2fe40407df4a2d73de99615f16
+            output: ppi-scout-runtime-macos-arm64.tar.gz
+            boltz_spec: boltz==2.2.1
+          - label: Linux x86_64 for Windows WSL2
+            os: ubuntu-24.04
+            archive: cpython-3.12.13+20260623-x86_64-unknown-linux-gnu-install_only.tar.gz
+            python_sha256: 9fa869d69be54f6b8eeae64272fbd9bb0646e0e1a8da9d80e51ba5a3bee48930
+            output: ppi-scout-runtime-linux-x86_64.tar.gz
+            boltz_spec: boltz[cuda]==2.2.1
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download pinned relocatable CPython
+        env:
+          ARCHIVE: ${{ matrix.archive }}
+          EXPECTED: ${{ matrix.python_sha256 }}
+        run: |
+          set -euo pipefail
+          url="https://github.com/astral-sh/python-build-standalone/releases/download/20260623/${ARCHIVE//+/%2B}"
+          curl -fL --retry 3 -o "$ARCHIVE" "$url"
+          actual="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+          test "$actual" = "$EXPECTED"
+          mkdir runtime
+          tar -xzf "$ARCHIVE" -C runtime
+
+      - name: Install pinned local inference stack
+        env:
+          BOLTZ_SPEC: ${{ matrix.boltz_spec }}
+        run: |
+          set -euo pipefail
+          runtime/python/bin/python3 -m pip install --disable-pip-version-check --no-cache-dir "$BOLTZ_SPEC" .
+          PATH="$PWD/runtime/python/bin:$PATH" runtime/python/bin/python3 -m ppi_scout.offline doctor >/dev/null
+          runtime/python/bin/python3 - <<'PY'
+          import boltz
+          import ppi_scout
+          import torch
+          print("ppi-scout", ppi_scout.__version__)
+          print("boltz", getattr(boltz, "__version__", "2.2.1"))
+          print("torch", torch.__version__)
+          PY
+
+      - name: Archive and split for GitHub limits
+        env:
+          OUTPUT: ${{ matrix.output }}
+        run: |
+          set -euo pipefail
+          tar -czf "$OUTPUT" -C runtime python
+          mkdir dist
+          shasum -a 256 "$OUTPUT" > "dist/$OUTPUT.sha256"
+          split -b 1900m -d -a 3 "$OUTPUT" "dist/$OUTPUT.part-"
+          shasum -a 256 dist/*.part-* > "dist/$OUTPUT.parts.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: dist/
+          compression-level: 0
+          retention-days: 7
