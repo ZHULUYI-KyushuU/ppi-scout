@@ -81,6 +81,7 @@ def build_common_archive(bundle: Path, destination: Path) -> None:
         "Run-PPI-Scout-macOS.command",
         "Run-PPI-Scout-Windows.cmd",
         "README.md",
+        "BUNDLE-SHA256SUMS",
         "jobs",
         "msas",
         "models/SHA256SUMS",

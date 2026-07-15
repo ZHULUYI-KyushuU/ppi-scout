@@ -35,6 +35,7 @@ class PrepareOfflineReleaseTests(unittest.TestCase):
                 "Run-PPI-Scout-macOS.command",
                 "Run-PPI-Scout-Windows.cmd",
                 "README.md",
+                "BUNDLE-SHA256SUMS",
                 "jobs/current-job.json",
                 "msas/README.md",
                 "models/SHA256SUMS",
