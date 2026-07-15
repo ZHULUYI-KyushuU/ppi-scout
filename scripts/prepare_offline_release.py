@@ -49,7 +49,7 @@ def sha256(path: Path) -> str:
 def split_asset(source: Path, target: str, output: Path, chunk_size: int) -> list[Part]:
     final_digest = sha256(source)
     count = max(1, (source.stat().st_size + chunk_size - 1) // chunk_size)
-    safe_name = target.replace("/", "-").replace("_", "-")
+    safe_name = target.replace("/", "-").replace("_", "-").lstrip(".")
     parts: list[Part] = []
     with source.open("rb") as reader:
         for index in range(count):
@@ -223,6 +223,7 @@ def prepare(args: argparse.Namespace) -> None:
     common = output / "ppi-scout-offline-common.tar.gz"
     build_common_archive(bundle, common)
     common_parts = split_asset(common, ".bootstrap/common.tar.gz", output, args.chunk_size)
+    common.unlink()
 
     model_targets = (
         "models/mols.tar",

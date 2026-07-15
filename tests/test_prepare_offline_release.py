@@ -68,6 +68,7 @@ class PrepareOfflineReleaseTests(unittest.TestCase):
             self.assertTrue(mac_zip.is_file())
             self.assertTrue(windows_zip.is_file())
             self.assertTrue((output / "release-assets.sha256").is_file())
+            self.assertFalse((output / "ppi-scout-offline-common.tar.gz").exists())
             with zipfile.ZipFile(mac_zip) as archive:
                 script = archive.read("Online-Setup-and-Run-macOS.command").decode()
             self.assertIn("offline-test", script)
