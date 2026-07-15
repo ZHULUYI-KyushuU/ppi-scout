@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from ppi_scout.executor import prepare_workspace, run_manifest
+from ppi_scout.executor import execute_prepared, prepare_workspace, run_manifest
 
 
 class ExecutorTests(unittest.TestCase):
@@ -50,6 +50,81 @@ class ExecutorTests(unittest.TestCase):
             path.write_text(json.dumps(manifest), encoding="utf-8")
             result = run_manifest(path, root / "run")
         self.assertEqual(result["status"], "dry_run")
+
+    def test_resume_skips_tasks_already_marked_complete(self) -> None:
+        manifest = {
+            "prediction_jobs": [
+                {
+                    "id": "wt",
+                    "chains": [
+                        {"id": "A", "sequence": "ACDEFG"},
+                        {"id": "B", "sequence": "WQQL"},
+                    ],
+                },
+                {
+                    "id": "mutant",
+                    "chains": [
+                        {"id": "A", "sequence": "ACDEFG"},
+                        {"id": "B", "sequence": "AQQL"},
+                    ],
+                },
+            ]
+        }
+
+        class FakeBackend:
+            def __init__(self) -> None:
+                self.calls: list[list[str]] = []
+
+            def run(self, argv, *, live, log_path, stream):
+                self.calls.append(argv)
+                return {"status": "complete", "argv": argv, "returncode": 0}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tasks = prepare_workspace(manifest, root)
+            (root / "status.json").write_text(
+                json.dumps(
+                    {
+                        "status": "interrupted",
+                        "tasks": {"wt": {"status": "complete", "returncode": 0}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            backend = FakeBackend()
+            result = execute_prepared(
+                tasks,
+                root,
+                live=True,
+                backend=backend,
+                resume=True,
+                stream=True,
+            )
+
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(result["skipped_on_resume"], ["wt"])
+        self.assertEqual(len(backend.calls), 1)
+
+    def test_resume_refuses_changed_manifest(self) -> None:
+        first = {
+            "name": "first",
+            "chains": [
+                {"id": "A", "sequence": "ACDEFG"},
+                {"id": "B", "sequence": "WQQL"},
+            ],
+        }
+        changed = {
+            **first,
+            "chains": [
+                {"id": "A", "sequence": "ACDEFG"},
+                {"id": "B", "sequence": "AQQL"},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prepare_workspace(first, root, resume=True)
+            with self.assertRaisesRegex(ValueError, "different panel manifest"):
+                prepare_workspace(changed, root, resume=True)
 
 
 if __name__ == "__main__":

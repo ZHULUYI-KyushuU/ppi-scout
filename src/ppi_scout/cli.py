@@ -8,6 +8,7 @@ so a new user can inspect and share a resolved job before spending GPU time.
 from __future__ import annotations
 
 import argparse
+import copy
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 import importlib
@@ -21,6 +22,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from . import __version__
 from .i18n import SUPPORTED_LANGUAGES, Translator, choose_language, normalize_language
+from .msa_library import LocalMSAResolution, resolve_receptor_msa
 
 
 ROUTES = ("auto", "full-length", "domain", "motif-peptide")
@@ -936,6 +938,190 @@ def _command_run(args: argparse.Namespace, translator: Translator) -> int:
     return 0
 
 
+def _command_run_panel(args: argparse.Namespace, translator: Translator) -> int:
+    """Prepare, execute, resume, analyze, and report a matched peptide panel."""
+
+    live_requested = bool(getattr(args, "live", False))
+    job = _load_document(args.job)
+    proteins = job.get("inputs", {}).get("proteins", [])
+    hypothesis = job.get("hypothesis")
+    if not isinstance(hypothesis, dict):
+        raise CLIError("run-panel requires a reviewed job with a recorded motif hypothesis.")
+    motif_owner = str(hypothesis.get("motif_owner", "")).upper()
+    owner = next(
+        (item for item in proteins if str(item.get("id", "")).upper() == motif_owner),
+        None,
+    )
+    if owner is None or not owner.get("sequence"):
+        raise CLIError("run-panel requires an exact sequence for the recorded motif owner.")
+    windows = (
+        _parse_windows(args.windows)
+        if args.windows
+        else _default_peptide_windows(len(str(owner["sequence"])))
+    )
+
+    receptor_msa: str | None = None
+    msa_resolution: LocalMSAResolution | None = None
+    if args.receptor_msa:
+        msa_path = Path(args.receptor_msa).expanduser().resolve()
+        if not msa_path.is_file():
+            raise CLIError(f"Local receptor MSA file does not exist: {msa_path}")
+        receptor_msa = str(msa_path)
+    elif args.msa_library:
+        receptor = next(
+            (item for item in proteins if str(item.get("id", "")).upper() != motif_owner),
+            None,
+        )
+        if receptor is None or not receptor.get("sequence"):
+            raise CLIError("run-panel requires an exact receptor sequence for MSA lookup.")
+        try:
+            msa_resolution = resolve_receptor_msa(
+                Path(args.msa_library),
+                str(receptor["sequence"]),
+            )
+        except (OSError, ValueError) as exc:
+            raise CLIError(str(exc)) from exc
+        if msa_resolution.path is not None:
+            receptor_msa = str(msa_resolution.path)
+            print(
+                f"Using exact local receptor MSA: {msa_resolution.path}",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "No exact local receptor MSA was found; using offline single-sequence mode.",
+                file=sys.stderr,
+            )
+
+    try:
+        backend_module = importlib.import_module("ppi_scout.backends.boltz2")
+        executor_module = importlib.import_module("ppi_scout.executor")
+        panel_module = importlib.import_module("ppi_scout.panel_execution")
+        backend = backend_module.Boltz2Backend()
+    except (ImportError, AttributeError) as exc:
+        raise CLIError(translator.t("core_unavailable")) from exc
+    if live_requested and not backend.doctor().available:
+        raise CLIError("Boltz is unavailable. Run `ppi-scout doctor` before live execution.")
+
+    try:
+        manifest = panel_module.build_panel_manifest(
+            job,
+            windows=windows,
+            design_seed=args.design_seed,
+            prediction_seed=args.prediction_seed,
+            scramble_count=args.scrambles,
+            remote_msa=bool(args.remote_msa),
+            receptor_msa=receptor_msa,
+            output_format=args.output_format,
+            accelerator=args.accelerator,
+            no_kernels=(None if args.kernels is None else not args.kernels),
+            recycling_steps=args.recycling_steps,
+            sampling_steps=args.sampling_steps,
+            diffusion_samples=args.diffusion_samples,
+        )
+    except (TypeError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    if msa_resolution is not None:
+        manifest["msa"]["library_lookup"] = msa_resolution.to_dict()
+        if not msa_resolution.matched:
+            manifest["warnings"].append(
+                "No exact sequence-addressed receptor MSA was found in the local library; "
+                "the panel uses offline single-sequence mode."
+            )
+
+    output_dir = Path(
+        args.output_dir or f"runs/{_safe_job_slug(job.get('name'))}-panel"
+    ).expanduser()
+    try:
+        tasks = executor_module.prepare_workspace(
+            manifest,
+            output_dir,
+            backend=backend,
+            resume=True,
+        )
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    run_job = copy.deepcopy(job)
+    run_job["peptide_design"] = manifest["peptide_design"]
+    run_job["execution"] = {
+        **dict(run_job.get("execution", {})),
+        "backend": "boltz2",
+        "kind": "motif_peptide_panel",
+        "status": "planned",
+        "remote_msa": bool(args.remote_msa),
+        "output_format": args.output_format,
+        "engine_settings": manifest["execution"]["engine_settings"],
+        "task_count": len(tasks),
+        "automatic_resume": True,
+    }
+    run_job["privacy"] = {
+        **dict(run_job.get("privacy", {})),
+        "local_first": not bool(args.remote_msa),
+        "sequence_upload_authorized": bool(args.remote_msa),
+        "msa_mode": manifest["msa"]["mode"],
+    }
+    run_job["panel_manifest"] = "manifest.resolved.json"
+    page_language = getattr(args, "lang", None) or run_job.get("language")
+    (output_dir / "job.json").write_text(
+        json.dumps(run_job, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    (output_dir / "panel.json").write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    try:
+        status = executor_module.execute_prepared(
+            tasks,
+            output_dir,
+            live=live_requested,
+            backend=backend,
+            resume=True,
+            stream=live_requested,
+        )
+    except KeyboardInterrupt:
+        try:
+            status = json.loads((output_dir / "status.json").read_text(encoding="utf-8"))
+            _finalize_run_artifacts(output_dir, run_job, status, language=page_language)
+        except (OSError, json.JSONDecodeError):
+            pass
+        raise
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        try:
+            status = json.loads((output_dir / "status.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            status = {"status": "failed", "error": str(exc)}
+        status["error"] = str(exc)
+        status = _finalize_run_artifacts(output_dir, run_job, status, language=page_language)
+        _print_run_visualization_status(status, translator)
+        raise CLIError(str(exc)) from exc
+
+    try:
+        analysis = importlib.import_module("ppi_scout.analysis")
+        reporting = importlib.import_module("ppi_scout.reporting")
+        rows = analysis.collect_confidence_files(output_dir)
+        summary_path = analysis.write_summary_csv(rows, output_dir / "confidence_summary.csv")
+        report_path = reporting.write_markdown_report(run_job, rows, output_dir / "report.md")
+        status["artifacts"] = {
+            "panel": str(output_dir / "panel.json"),
+            "plan": str(output_dir / "plan.json"),
+            "confidence_summary": str(summary_path),
+            "markdown_report": str(report_path),
+        }
+        status["confidence_rows"] = len(rows)
+    except (ImportError, AttributeError, OSError, TypeError, ValueError) as exc:
+        status["analysis_warning"] = str(exc)
+    status["task_count"] = len(tasks)
+    status["msa_mode"] = manifest["msa"]["mode"]
+    status = _finalize_run_artifacts(output_dir, run_job, status, language=page_language)
+    _print_run_visualization_status(status, translator)
+    _emit(status, requested_format="json", output=None, translator=translator)
+    return 0
+
+
 def _command_resume(args: argparse.Namespace, translator: Translator) -> int:
     run_path = Path(args.run_id).expanduser()
     job_candidates = [run_path / "job.json", run_path / "resolved_job.json"]
@@ -1290,6 +1476,60 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--remote-msa", action="store_true", help="Explicitly authorize remote MSA use.")
     run.add_argument("--output-format", choices=("pdb", "mmcif"), default="pdb")
     run.set_defaults(handler=_command_run)
+
+    panel = subparsers.add_parser(
+        "run-panel",
+        help="Run and automatically resume a reviewed local motif-peptide control panel.",
+    )
+    panel.add_argument("job", help="Reviewed motif-peptide job JSON/YAML path.")
+    panel.add_argument("--output-dir")
+    panel_mode = panel.add_mutually_exclusive_group()
+    panel_mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Compile every panel task without executing Boltz (safe default).",
+    )
+    panel_mode.add_argument(
+        "--live",
+        action="store_true",
+        help="Explicitly execute every unfinished panel task and stream Boltz logs.",
+    )
+    panel.add_argument(
+        "--windows",
+        help="Comma-separated peptide lengths; defaults to 16,24,34 clamped to the parent.",
+    )
+    panel.add_argument("--design-seed", type=int, default=17)
+    panel.add_argument("--prediction-seed", type=int, default=17)
+    panel.add_argument("--scrambles", type=int, default=3, help="Composition-matched scrambles (minimum 3).")
+    msa_mode = panel.add_mutually_exclusive_group()
+    msa_mode.add_argument(
+        "--remote-msa",
+        action="store_true",
+        help="Explicitly authorize sending protein sequences to the configured MSA service.",
+    )
+    msa_mode.add_argument(
+        "--receptor-msa",
+        help="Audited local/precomputed receptor MSA path; peptides remain msa: empty.",
+    )
+    msa_mode.add_argument(
+        "--msa-library",
+        help=(
+            "Offline A3M directory addressed by exact receptor sequence SHA-256; "
+            "falls back to msa: empty when no exact match exists."
+        ),
+    )
+    panel.add_argument("--output-format", choices=("pdb", "mmcif"), default="pdb")
+    panel.add_argument("--accelerator", choices=("auto", "gpu", "cpu", "tpu"), default="auto")
+    panel.add_argument(
+        "--kernels",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable specialized kernels; Apple Silicon auto-disables them.",
+    )
+    panel.add_argument("--recycling-steps", type=int, default=3)
+    panel.add_argument("--sampling-steps", type=int, default=200)
+    panel.add_argument("--diffusion-samples", type=int, default=1)
+    panel.set_defaults(handler=_command_run_panel)
 
     resume = subparsers.add_parser("resume", help="Resume a run directory using its resolved job.")
     resume.add_argument("run_id", help="Run directory path.")

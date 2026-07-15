@@ -43,6 +43,37 @@ The HTML output is self-contained and opens locally without a server. This
 example demonstrates planning and peptide design; it does not run Boltz or
 generate a new binding claim.
 
+## One-command local Atg8–Yta7 FDFL panel
+
+`atg8-yta7-fdfl-job.json` records an exploratory motif-peptide hypothesis for
+Atg8 and Yta7 P40340 residues 43–66. The `FDFL` core is peptide positions
+11–14 and source-protein positions 53–56. Review the warnings in the job before
+execution.
+
+Prepare the complete 10-task panel without inference:
+
+```bash
+ppi-scout run-panel examples/atg8-yta7-fdfl-job.json \
+  --windows 24 \
+  --design-seed 7 \
+  --output-dir runs/atg8-yta7-fdfl \
+  --dry-run
+```
+
+After accepting the exact sequences, coordinates, controls, single-sequence
+MSA tradeoff, and expected compute cost, run or resume every unfinished task:
+
+```bash
+ppi-scout run-panel examples/atg8-yta7-fdfl-job.json \
+  --windows 24 \
+  --design-seed 7 \
+  --output-dir runs/atg8-yta7-fdfl \
+  --live
+```
+
+The default does not contact a remote MSA service. The output is structural
+model evidence for an exploratory hypothesis, not proof of binding.
+
 ## HelixFold3 Atg8–Yta7 control panel
 
 `helixfold3-yta7-panel.json` is a separate, exact five-job manifest for an

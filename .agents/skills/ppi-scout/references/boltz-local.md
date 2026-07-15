@@ -59,6 +59,22 @@ PPI Scout compiles the upstream form:
 boltz predict INPUT.yaml --out_dir OUTPUT_DIR
 ```
 
+For a reviewed `motif_peptide` job, use `run-panel` to compile and execute all
+matched controls without manually creating separate inputs:
+
+```bash
+ppi-scout run-panel job.json --windows 24 --output-dir runs/JOB_NAME-panel --dry-run
+ppi-scout run-panel job.json --windows 24 --output-dir runs/JOB_NAME-panel --live
+```
+
+The live form streams Boltz output and automatically skips completed variants
+when rerun with the identical manifest. It also writes the panel manifest,
+compiled plan, confidence CSV, Markdown report, and offline HTML page. Change
+the output directory whenever sequences, windows, seeds, MSA policy, output
+format, or sampling settings change. Apple Silicon defaults to the MPS-backed
+GPU path with specialized kernels disabled. Do not add `--remote-msa` unless
+sequence upload has been explicitly authorized.
+
 Capture the PPI Scout version, Boltz version/help probe, exact job JSON, compiled YAML, full command, resolved sequences, MSA inputs, and logs in the run directory.
 
 ## Choose MSA mode explicitly

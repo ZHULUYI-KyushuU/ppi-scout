@@ -85,6 +85,7 @@ def prepare_workspace(
     run_dir: Path,
     *,
     backend: Boltz2Backend | None = None,
+    resume: bool = False,
 ) -> list[PreparedTask]:
     backend = backend or Boltz2Backend()
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -92,6 +93,22 @@ def prepare_workspace(
         (run_dir / child).mkdir(exist_ok=True)
 
     resolved_path = run_dir / "manifest.resolved.json"
+    status_path = run_dir / "status.json"
+    if resume and status_path.is_file() and not resolved_path.is_file():
+        raise ValueError(
+            "Cannot resume: status.json exists without manifest.resolved.json. "
+            "Preserve the directory for inspection and use a new output directory."
+        )
+    if resume and resolved_path.is_file():
+        try:
+            previous_manifest = json.loads(resolved_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"Cannot resume: existing manifest is unreadable: {exc}") from exc
+        if _json_hash(previous_manifest) != _json_hash(manifest):
+            raise ValueError(
+                "Cannot resume: the output directory contains a different panel manifest. "
+                "Use a new output directory when inputs or settings change."
+            )
     resolved_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
     prepared: list[PreparedTask] = []
@@ -116,6 +133,7 @@ def prepare_workspace(
             input_path,
             output_dir,
             remote_msa=remote_msa,
+            output_format=task.get("output_format", manifest.get("output_format", "pdb")),
             extra_args=task.get("engine_args", manifest.get("engine_args", ())),
         )
         prepared.append(
@@ -135,10 +153,11 @@ def prepare_workspace(
         "tasks": [task.to_dict() for task in prepared],
     }
     (run_dir / "plan.json").write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
-    (run_dir / "status.json").write_text(
-        json.dumps({"status": "planned", "tasks": {}}, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    if not (resume and status_path.is_file()):
+        status_path.write_text(
+            json.dumps({"status": "planned", "tasks": {}}, indent=2) + "\n",
+            encoding="utf-8",
+        )
     return prepared
 
 
@@ -148,17 +167,55 @@ def execute_prepared(
     *,
     live: bool = False,
     backend: Boltz2Backend | None = None,
+    resume: bool = False,
+    stream: bool = False,
 ) -> dict[str, Any]:
     backend = backend or Boltz2Backend()
     statuses: dict[str, Any] = {}
-    for task in tasks:
-        result = backend.run(
-            list(task.argv),
-            live=live,
-            log_path=run_dir / "logs" / f"{task.task_id}.json",
-        )
+    status_path = run_dir / "status.json"
+    if resume and status_path.is_file():
+        try:
+            stored = json.loads(status_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            stored = {}
+        stored_tasks = stored.get("tasks", {}) if isinstance(stored, dict) else {}
+        if isinstance(stored_tasks, dict):
+            statuses.update(stored_tasks)
+
+    task_list = list(tasks)
+    skipped: list[str] = []
+    for task in task_list:
+        previous = statuses.get(task.task_id)
+        if resume and isinstance(previous, dict) and previous.get("status") == "complete":
+            skipped.append(task.task_id)
+            continue
+        try:
+            result = backend.run(
+                list(task.argv),
+                live=live,
+                log_path=run_dir / "logs" / f"{task.task_id}.json",
+                stream=stream,
+            )
+        except KeyboardInterrupt:
+            statuses[task.task_id] = {"status": "interrupted", "argv": list(task.argv)}
+            status_path.write_text(
+                json.dumps({"status": "interrupted", "tasks": statuses}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            raise
+        except Exception as exc:
+            statuses[task.task_id] = {
+                "status": "failed",
+                "argv": list(task.argv),
+                "error": str(exc),
+            }
+            status_path.write_text(
+                json.dumps({"status": "partial_failed", "tasks": statuses}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            raise
         statuses[task.task_id] = result
-        (run_dir / "status.json").write_text(
+        status_path.write_text(
             json.dumps(
                 {"status": "running" if live else "dry_run", "tasks": statuses},
                 indent=2,
@@ -166,9 +223,14 @@ def execute_prepared(
             + "\n",
             encoding="utf-8",
         )
-    final_status = "complete" if live else "dry_run"
-    payload = {"status": final_status, "tasks": statuses}
-    (run_dir / "status.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    all_complete = bool(task_list) and all(
+        isinstance(statuses.get(task.task_id), dict)
+        and statuses[task.task_id].get("status") == "complete"
+        for task in task_list
+    )
+    final_status = "complete" if all_complete else ("complete" if live else "dry_run")
+    payload = {"status": final_status, "tasks": statuses, "skipped_on_resume": skipped}
+    status_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return payload
 
 
