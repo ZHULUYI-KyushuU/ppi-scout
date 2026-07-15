@@ -40,8 +40,8 @@ description: Plan, execute, resume, and conservatively interpret reproducible lo
 3. Run `ppi-scout doctor` before planning. Treat it as read-only; do not install packages or change MSA policy automatically.
 4. Run `ppi-scout plan` before every live run. Default to `--mode auto`; use a manual mode only when the user requests or justifies it.
 5. Review the job plan with the user. Show resolved sequences and coordinates, selected representation, reasons, warnings, peptide controls, MSA mode, external data flow, and output location.
-6. Use `ppi-scout run JOB --dry-run` to inspect the compiled Boltz command. `run` is dry-run by default; live execution requires an explicit `--live` only after the plan is accepted and any remote-MSA disclosure is resolved. Every dry or live run automatically attempts `OUTPUT_DIR/report.html`.
-7. Use `ppi-scout resume RUN_ID` for an interrupted run; resume is also dry-run by default, requires `--live` to execute, and automatically attempts the same run directory's `report.html`. Use `analyze` and then `report` without silently changing the original job. Use manual `visualize` only to regenerate HTML or to view a scan/job JSON.
+6. Use `ppi-scout run JOB --dry-run` for one complex, or `ppi-scout run-panel JOB --dry-run` for a reviewed motif-peptide control panel. Both remain dry-run by default. Require an explicit `--live` only after the plan is accepted and any remote-MSA disclosure is resolved.
+7. For a motif panel, rerun the same `run-panel ... --live` command after interruption; it skips completed tasks and automatically regenerates the confidence CSV, Markdown report, and offline `report.html`. Use `ppi-scout resume RUN_ID` for a single-complex run. Never change inputs or settings inside an existing output directory.
 
 Typical sequence:
 
@@ -54,6 +54,24 @@ ppi-scout analyze runs/atg8-atg19
 ppi-scout --lang zh-CN report runs/atg8-atg19 -o runs/atg8-atg19/report.md
 # runs/atg8-atg19/report.html is attempted automatically after both run commands
 ```
+
+For a reviewed motif-peptide job, use the deterministic panel executor instead
+of manually rewriting one Boltz input per control:
+
+```bash
+ppi-scout run-panel job.json --windows 24 --output-dir runs/atg8-motif --dry-run
+ppi-scout run-panel job.json --windows 24 --output-dir runs/atg8-motif --live
+```
+
+Treat the second command as the single explicit resource-use confirmation. It
+generates every independent WT/control input, streams live Boltz progress,
+resumes unfinished variants, analyzes confidence files, and writes
+`panel.json`, `plan.json`, `confidence_summary.csv`, `report.md`, and
+`report.html`. Default to single-sequence `msa: empty`. Use
+`--receptor-msa PATH` for an audited local MSA or `--remote-msa` only after
+explicit sequence-upload permission. On Apple Silicon, leave
+`--accelerator auto`; it selects the MPS-backed GPU path and disables
+unsupported specialized kernels.
 
 ## Run an authorized official HelixFold3 cloud panel
 
@@ -116,7 +134,7 @@ ppi-scout design-peptides \
 - Never use the Boltz affinity module or affinity outputs for protein-protein or protein-peptide affinity; it is a small-molecule-to-protein module.
 - Compare WT and controls only under matched settings, inspect the expected interface, and label conclusions as structural-model support, ambiguity, or lack of support.
 - Treat `--use_msa_server` as sequence disclosure to a remote service. Do not send unpublished, proprietary, patient-derived, or otherwise sensitive sequences without explicit permission. Prefer a local/precomputed MSA or `msa: empty` when disclosure is not allowed, and document the accuracy tradeoff.
-- After every `run` or `resume`, tell the user that PPI Scout automatically attempts the run directory's self-contained `report.html` and that it can be opened by double-clicking. A visualization failure is not a Boltz failure: inspect and explain the run-status fields and `status.json` separately from visualization status or warnings.
+- After every `run`, `run-panel`, or `resume`, tell the user that PPI Scout automatically attempts the run directory's self-contained `report.html` and that it can be opened by double-clicking. A visualization failure is not a Boltz failure: inspect and explain the run-status fields and `status.json` separately from visualization status or warnings.
 - Use `ppi-scout --lang LANGUAGE visualize RUN_OR_JSON` manually only to regenerate a page or visualize a scan/job JSON. A run directory produces `report.html`; a JSON file produces `<source-stem>-report.html`. Explain every section, state clearly when no confidence files exist, and never turn a bar length or high score into a binding claim.
 
 Read [boltz-local.md](references/boltz-local.md) before Boltz installation or

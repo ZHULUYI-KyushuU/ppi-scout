@@ -56,6 +56,7 @@ class CLITests(unittest.TestCase):
             "design-peptides",
             "scan-motifs",
             "run",
+            "run-panel",
             "resume",
             "analyze",
             "report",
@@ -63,6 +64,74 @@ class CLITests(unittest.TestCase):
             "import-legacy",
         ):
             self.assertIn(command, help_text)
+
+    def test_run_panel_dry_run_prepares_all_controls_and_reports(self) -> None:
+        job = {
+            "schema_version": "1.0",
+            "name": "atg8-yta7-fdfl",
+            "language": "zh-CN",
+            "inputs": {
+                "organism": "Saccharomyces cerevisiae S288c",
+                "proteins": [
+                    {
+                        "id": "A",
+                        "name": "Atg8",
+                        "sequence": "MKSTFKSEYPFEKRKAESERIADRFKNRIPVICEKAEKSDIPEIDKRKYLVPADLTVGQFVYVIRKRIMLPPEKAIFIFVNDTLPPTAALMSAIYQEHKDKDGFLYVTYSGENTFGR",
+                    },
+                    {
+                        "id": "B",
+                        "name": "Yta7-43-66",
+                        "sequence": "KINYAEIEKVFDFLEDDQVMDKDE",
+                    },
+                ],
+            },
+            "routing": {
+                "route": "motif_peptide",
+                "selected_region": [11, 14],
+                "selected_motif": "FDFL",
+            },
+            "hypothesis": {
+                "motif_owner": "B",
+                "motif_sequence": "FDFL",
+                "motif_region": [11, 14],
+                "motif_context": "exposed",
+                "receptor_has_motif_pocket": True,
+                "coordinate_convention": "1-based inclusive",
+            },
+            "execution": {"backend": "boltz2", "status": "planned", "remote_msa": False},
+            "privacy": {"local_first": True, "sequence_upload_authorized": False},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            job_path = root / "job.json"
+            run_dir = root / "run"
+            job_path.write_text(json.dumps(job), encoding="utf-8")
+            exit_code, stdout, _ = self.run_cli(
+                [
+                    "--lang",
+                    "zh-CN",
+                    "run-panel",
+                    str(job_path),
+                    "--windows",
+                    "24",
+                    "--design-seed",
+                    "7",
+                    "--output-dir",
+                    str(run_dir),
+                    "--dry-run",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+            result = json.loads(stdout)
+            self.assertEqual(result["status"], "dry_run")
+            self.assertEqual(result["task_count"], 10)
+            self.assertEqual(result["msa_mode"], "single_sequence")
+            self.assertEqual(len(json.loads((run_dir / "plan.json").read_text())["tasks"]), 10)
+            self.assertTrue((run_dir / "panel.json").is_file())
+            self.assertTrue((run_dir / "confidence_summary.csv").is_file())
+            self.assertTrue((run_dir / "report.md").is_file())
+            self.assertTrue((run_dir / "report.html").is_file())
 
     def test_default_run_directory_slug_cannot_escape_runs(self) -> None:
         self.assertEqual(_safe_job_slug("../../../tmp/secret"), "tmp-secret")

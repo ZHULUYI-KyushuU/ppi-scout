@@ -1,7 +1,7 @@
 interface:
   display_name: "PPI Scout"
-  short_description: "Plan reproducible protein interaction screens"
-  default_prompt: "Use $ppi-scout to plan a reproducible local protein interaction screen and document the selected representation."
+  short_description: "Plan and run reproducible local PPI panels"
+  default_prompt: "Use $ppi-scout to plan and run a reproducible local protein interaction panel with matched controls."
 
 policy:
   allow_implicit_invocation: true

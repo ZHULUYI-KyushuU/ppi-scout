@@ -1,4 +1,6 @@
 from pathlib import Path
+import json
+import sys
 import tempfile
 import unittest
 
@@ -31,6 +33,20 @@ class BoltzBackendTests(unittest.TestCase):
             argv = backend.command(Path(tmp) / "job.yaml", Path(tmp) / "out")
             result = backend.run(argv, live=False)
         self.assertEqual(result["status"], "dry_run")
+
+    def test_live_stream_echoes_and_persists_output(self) -> None:
+        backend = Boltz2Backend(executable=sys.executable)
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "run.json"
+            result = backend.run(
+                [sys.executable, "-c", "print('boltz-progress')"],
+                live=True,
+                log_path=log_path,
+                stream=True,
+            )
+            log = json.loads(log_path.read_text(encoding="utf-8"))
+        self.assertEqual(result["status"], "complete")
+        self.assertIn("boltz-progress", log["stdout"])
 
 
 if __name__ == "__main__":

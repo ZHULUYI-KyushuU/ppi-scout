@@ -32,6 +32,9 @@ confidence as experimental evidence of binding.
   policy.
 - Execute dry runs by default and require an explicit `--live` flag for model
   inference.
+- Expand a reviewed motif hypothesis into a complete matched-control Boltz
+  panel, stream progress, resume unfinished tasks, and write all summaries
+  with one `run-panel` command.
 - Collect confidence fields and generate Markdown and self-contained HTML
   reports.
 - Provide Chinese, English, and Japanese interactive prompts.
@@ -42,7 +45,7 @@ confidence as experimental evidence of binding.
 |---|---|
 | Planning, motif scanning, peptide design, and visualization | Python 3.10 or later |
 | Live Boltz prediction | Python 3.10-3.12 and a compatible Boltz installation |
-| Practical local inference | A supported accelerator; an NVIDIA CUDA GPU is the common configuration |
+| Practical local inference | A supported accelerator; NVIDIA CUDA and Apple Silicon MPS are supported paths |
 | Windows GPU execution | WSL2 with Ubuntu is recommended |
 
 Boltz supports CPU execution, but the upstream project notes that it is
@@ -166,6 +169,39 @@ The file is self-contained and can be opened directly in a browser. Use
 ppi-scout --lang en visualize runs/receptor-partner
 ```
 
+## One-command motif panel execution
+
+After `plan` has produced and you have reviewed a `motif_peptide` job, compile
+the complete WT/control panel without running Boltz:
+
+```bash
+ppi-scout run-panel job.json \
+  --windows 24 \
+  --output-dir runs/receptor-motif-panel \
+  --dry-run
+```
+
+Start every unfinished panel task with one explicit command:
+
+```bash
+ppi-scout run-panel job.json \
+  --windows 24 \
+  --output-dir runs/receptor-motif-panel \
+  --live
+```
+
+`run-panel` generates independent WT, anchor-mutant, `AAAA`, flank-scramble,
+composition-matched scramble, and reverse-decoy tasks under identical backend
+settings. It streams Boltz output, skips tasks already marked complete when the
+same command is rerun, and automatically writes `panel.json`, `plan.json`,
+`confidence_summary.csv`, `report.md`, and `report.html`.
+
+The default is local single-sequence mode (`msa: empty`) and does not enable a
+remote MSA service. Supply `--receptor-msa /path/to/receptor.a3m` for an audited
+local MSA. `--remote-msa` is the explicit sequence-upload authorization.
+On Apple Silicon, `--accelerator auto` selects the MPS-backed GPU path and
+disables unsupported specialized kernels.
+
 ## AIM/LIR workflow
 
 Candidate scanning is opt-in and requires a resolved amino-acid sequence:
@@ -195,7 +231,8 @@ topology, biological function, or binding.
 The bundled example uses the established *Saccharomyces cerevisiae*
 Atg8–Atg19 system with reviewed UniProtKB sequences (`P38182` and `P35193`).
 It includes a resolved job, a complete AIM scan, an evidence-selected peptide
-panel, and a command for generating the offline HTML view. See
+panel, an exploratory one-command Atg8–Yta7 FDFL panel, and commands for
+generating the offline HTML view. See
 [Example Workflows](examples/README.md).
 
 ## MSA policy

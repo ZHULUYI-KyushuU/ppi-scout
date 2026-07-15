@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 from typing import Any, Iterable
 
 
@@ -146,27 +147,56 @@ class Boltz2Backend:
         *,
         live: bool = False,
         log_path: Path | None = None,
+        stream: bool = False,
     ) -> dict[str, Any]:
         if not live:
             return {"status": "dry_run", "argv": argv}
         if shutil.which(argv[0]) is None and not Path(argv[0]).exists():
             raise RuntimeError("Boltz is unavailable. Run `ppi-scout doctor` before live execution.")
-        completed = subprocess.run(argv, check=False, capture_output=True, text=True)
+        if stream:
+            process = subprocess.Popen(
+                argv,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            output_parts: list[str] = []
+            try:
+                if process.stdout is not None:
+                    for line in process.stdout:
+                        output_parts.append(line)
+                        print(line, end="", file=sys.stderr, flush=True)
+                returncode = process.wait()
+            except KeyboardInterrupt:
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                raise
+            stdout = "".join(output_parts)
+            stderr = ""
+        else:
+            completed = subprocess.run(argv, check=False, capture_output=True, text=True)
+            returncode = completed.returncode
+            stdout = completed.stdout
+            stderr = completed.stderr
         if log_path is not None:
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.write_text(
                 json.dumps(
                     {
                         "argv": argv,
-                        "returncode": completed.returncode,
-                        "stdout": completed.stdout,
-                        "stderr": completed.stderr,
+                        "returncode": returncode,
+                        "stdout": stdout,
+                        "stderr": stderr,
                     },
                     indent=2,
                 )
                 + "\n",
                 encoding="utf-8",
             )
-        if completed.returncode != 0:
-            raise RuntimeError(f"Boltz failed with exit code {completed.returncode}; inspect the run log.")
-        return {"status": "complete", "argv": argv, "returncode": completed.returncode}
+        if returncode != 0:
+            raise RuntimeError(f"Boltz failed with exit code {returncode}; inspect the run log.")
+        return {"status": "complete", "argv": argv, "returncode": returncode}

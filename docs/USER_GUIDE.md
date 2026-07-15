@@ -189,6 +189,10 @@ The supported lifecycle is:
 doctor -> plan -> dry-run -> review -> live run -> analyze -> report
 ```
 
+For a reviewed motif-peptide hypothesis, `run-panel` automates the execution,
+resume, analysis, and report stages while retaining `--live` as the explicit
+resource-use boundary.
+
 ### 1. Environment check
 
 ```bash
@@ -246,6 +250,30 @@ Live inference is never implied by `run`; it requires `--live`.
 ppi-scout analyze runs/receptor-partner
 ppi-scout --lang en report runs/receptor-partner
 ```
+
+### Matched motif-peptide panels
+
+Use a job whose exact sequences, motif owner, 1-based inclusive coordinates,
+motif context, receptor pocket evidence, and `motif_peptide` route have already
+been reviewed:
+
+```bash
+ppi-scout run-panel job.json \
+  --windows 16,24,34 \
+  --output-dir runs/receptor-motif-panel \
+  --dry-run
+
+ppi-scout run-panel job.json \
+  --windows 16,24,34 \
+  --output-dir runs/receptor-motif-panel \
+  --live
+```
+
+The live command runs unfinished variants sequentially, streams Boltz output,
+and resumes automatically when rerun with the same inputs and settings. A
+different sequence, window, seed, MSA mode, or backend setting requires a new
+output directory. The default MSA mode is `msa: empty`; add `--remote-msa` only
+when sequence upload has been explicitly authorized.
 
 ## Representation selection
 
