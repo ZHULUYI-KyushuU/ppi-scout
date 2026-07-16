@@ -10,7 +10,7 @@ service, Hugging Face, or any other network service.
 PPI-Scout-Offline/
   Run-PPI-Scout-macOS.command
   Run-PPI-Scout-Windows.cmd
-  checksums.sha256
+  BUNDLE-SHA256SUMS
   jobs/current-job.json
   msas/<receptor-sequence-sha256>.a3m
   models/{mols.tar,boltz2_conf.ckpt,boltz2_aff.ckpt,SHA256SUMS}

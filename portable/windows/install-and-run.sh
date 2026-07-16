@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BUNDLE_ROOT="${1:?bundle root is required}"
-VERSION="0.4.0"
+VERSION="0.5.0"
 STATE_ROOT="/opt/ppi-scout-offline/$VERSION"
 RUNTIME_ARCHIVE="$BUNDLE_ROOT/windows-wsl2-x64/ppi-scout-runtime-linux-x86_64.tar.gz"
 RUNTIME_ROOT="$STATE_ROOT/runtime"

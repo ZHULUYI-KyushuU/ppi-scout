@@ -1,4 +1,4 @@
-name: Build offline runtimes
+name: Build offline runtimes and Windows bundle
 
 on:
   workflow_dispatch:
@@ -7,8 +7,12 @@ on:
       - ".github/workflows/build-offline-runtimes.yml"
       - "portable/**"
       - "scripts/prepare_offline_release.py"
+      - "examples/atg8-yta7-fdfl-job.json"
       - "src/**"
       - "pyproject.toml"
+
+env:
+  PPI_SCOUT_VERSION: "0.5.0"
 
 permissions:
   contents: read
@@ -82,3 +86,116 @@ jobs:
           path: dist/
           compression-level: 0
           retention-days: 7
+
+  windows-offline:
+    name: Complete Windows offline bundle
+    needs: runtime
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free space for the multi-gigabyte verified payload
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc
+          df -h .
+
+      - name: Download the verified Linux runtime parts
+        uses: actions/download-artifact@v4
+        with:
+          name: ppi-scout-runtime-linux-x86_64.tar.gz
+          path: runtime-parts
+
+      - name: Reconstruct and verify the Linux runtime
+        run: |
+          set -euo pipefail
+          mkdir -p bundle/windows-wsl2-x64
+          cat runtime-parts/ppi-scout-runtime-linux-x86_64.tar.gz.part-* \
+            > bundle/windows-wsl2-x64/ppi-scout-runtime-linux-x86_64.tar.gz
+          expected="$(awk 'NR == 1 {print $1}' runtime-parts/ppi-scout-runtime-linux-x86_64.tar.gz.sha256)"
+          actual="$(sha256sum bundle/windows-wsl2-x64/ppi-scout-runtime-linux-x86_64.tar.gz | awk '{print $1}')"
+          test "$actual" = "$expected"
+          rm -rf runtime-parts
+
+      - name: Download and verify the pinned Boltz 2 model payload
+        run: |
+          set -euo pipefail
+          mkdir -p bundle/models
+          cp portable/models/SHA256SUMS bundle/models/
+          download() {
+            destination="$1"
+            primary="$2"
+            fallback="${3:-}"
+            if ! curl -fL --retry 5 --retry-all-errors -o "$destination" "$primary"; then
+              test -n "$fallback"
+              curl -fL --retry 5 --retry-all-errors -o "$destination" "$fallback"
+            fi
+          }
+          download bundle/models/mols.tar \
+            https://huggingface.co/boltz-community/boltz-2/resolve/main/mols.tar
+          download bundle/models/boltz2_conf.ckpt \
+            https://model-gateway.boltz.bio/boltz2_conf.ckpt \
+            https://huggingface.co/boltz-community/boltz-2/resolve/main/boltz2_conf.ckpt
+          download bundle/models/boltz2_aff.ckpt \
+            https://model-gateway.boltz.bio/boltz2_aff.ckpt \
+            https://huggingface.co/boltz-community/boltz-2/resolve/main/boltz2_aff.ckpt
+          cd bundle/models
+          sha256sum -c SHA256SUMS
+
+      - name: Download and verify the official Ubuntu WSL2 root filesystem
+        env:
+          UBUNTU_WSL_BASE: https://cdimages.ubuntu.com/ubuntu-wsl/noble/daily-live/current
+        run: |
+          set -euo pipefail
+          mkdir -p ubuntu-wsl
+          curl -fL --retry 5 --retry-all-errors -o ubuntu-wsl/SHA256SUMS "$UBUNTU_WSL_BASE/SHA256SUMS"
+          grep -E '[ *]noble-wsl-amd64\.wsl$' ubuntu-wsl/SHA256SUMS > ubuntu-wsl/rootfs.sha256
+          curl -fL --retry 5 --retry-all-errors -o ubuntu-wsl/noble-wsl-amd64.wsl \
+            "$UBUNTU_WSL_BASE/noble-wsl-amd64.wsl"
+          cd ubuntu-wsl
+          sha256sum -c rootfs.sha256
+          tar -tf noble-wsl-amd64.wsl >/dev/null
+          cd ..
+          mv ubuntu-wsl/noble-wsl-amd64.wsl bundle/windows-wsl2-x64/ubuntu-rootfs.tar.gz
+          rm -rf ubuntu-wsl
+
+      - name: Assemble the versioned bundle tree and checksum manifest
+        run: |
+          set -euo pipefail
+          mkdir -p bundle/jobs bundle/msas
+          cp portable/windows/Run-PPI-Scout-Windows.cmd bundle/
+          cp portable/windows/install-and-run.ps1 portable/windows/install-and-run.sh bundle/windows-wsl2-x64/
+          cp portable/README.md bundle/README.md
+          cp portable/msas/README.md bundle/msas/README.md
+          cp examples/atg8-yta7-fdfl-job.json bundle/jobs/current-job.json
+          printf '%s\n' \
+            "PPI Scout source commit: $GITHUB_SHA" \
+            "PPI Scout version: $PPI_SCOUT_VERSION" \
+            "Python standalone release: 20260623 / CPython 3.12.13" \
+            "Boltz package and model format: 2.2.1" \
+            "Model source: https://huggingface.co/boltz-community/boltz-2" \
+            "Ubuntu WSL source: https://cdimages.ubuntu.com/ubuntu-wsl/noble/daily-live/current/noble-wsl-amd64.wsl" \
+            > bundle/BUNDLE-SOURCES.txt
+          (
+            cd bundle
+            find models windows-wsl2-x64 jobs msas -type f -print0 | sort -z | xargs -0 sha256sum
+            sha256sum Run-PPI-Scout-Windows.cmd README.md BUNDLE-SOURCES.txt
+          ) > bundle/BUNDLE-SHA256SUMS
+
+      - name: Split into locally reconstructable Windows download parts
+        run: |
+          python scripts/prepare_offline_release.py \
+            --bundle bundle \
+            --output dist/PPI-Scout-Windows-Offline-v${PPI_SCOUT_VERSION} \
+            --tag v${PPI_SCOUT_VERSION} \
+            --windows-local \
+            --remove-payloads-after-split
+          ls -lh dist/PPI-Scout-Windows-Offline-v${PPI_SCOUT_VERSION}
+          df -h .
+
+      - name: Upload complete Windows offline bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: PPI-Scout-Windows-Offline-v${{ env.PPI_SCOUT_VERSION }}
+          path: dist/PPI-Scout-Windows-Offline-v${{ env.PPI_SCOUT_VERSION }}/
+          compression-level: 0
+          retention-days: 90

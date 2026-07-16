@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-VERSION="0.4.0"
+VERSION="0.5.0"
 STATE_ROOT="${PPI_SCOUT_STATE_ROOT:-$HOME/Library/Application Support/PPI-Scout-Offline/$VERSION}"
 RUNTIME_ARCHIVE="$ROOT/macos-arm64/ppi-scout-runtime-macos-arm64.tar.gz"
 RUNTIME_ROOT="$STATE_ROOT/runtime"
