@@ -1,0 +1,75 @@
+name: Test and package
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Python ${{ matrix.python-version }} unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install test environment
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[test]"
+      - name: Run unit and CLI tests
+        run: python -m pytest
+      - name: Compile Python sources
+        run: python -m compileall -q src scripts tests
+      - name: Smoke-test the installed command
+        run: |
+          ppi-scout --version
+          ppi-scout --lang en doctor
+
+  platform-smoke:
+    name: ${{ matrix.os }} installation smoke test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package
+        run: python -m pip install .
+      - name: Check command surface
+        run: |
+          ppi-scout --version
+          ppi-scout --help
+          ppi-scout --lang en doctor
+
+  build-wheel:
+    name: Build and inspect wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Build distribution
+        run: python -m pip install --upgrade build && python -m build
+      - name: Install wheel in a clean environment
+        run: |
+          python -m venv wheel-check
+          wheel-check/bin/python -m pip install dist/*.whl
+          wheel-check/bin/ppi-scout --version
+          wheel-check/bin/ppi-scout --lang en doctor

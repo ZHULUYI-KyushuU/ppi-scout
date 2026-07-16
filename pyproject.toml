@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ppi-scout"
-version = "0.4.0"
+version = "0.5.0"
 description = "A multilingual local workflow for planning protein interaction predictions."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -48,7 +48,7 @@ installed in the same environment.
 Install the released CLI directly from GitHub:
 
 ```bash
-python -m pip install "git+https://github.com/ZHULUYI-KyushuU/ppi-scout.git@v0.4.0"
+python -m pip install "git+https://github.com/ZHULUYI-KyushuU/ppi-scout.git@v0.5.0"
 ```
 
 To use the repository-scoped Codex Skill or contribute to the project, clone
