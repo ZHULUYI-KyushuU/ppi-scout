@@ -9,7 +9,7 @@ from ppi_scout import offline
 
 class OfflineEntryPointTests(unittest.TestCase):
     def test_remote_msa_is_refused_before_cli_import(self) -> None:
-        self.assertEqual(offline.main(["run-panel", "job.json", "--remote-msa"]), 2)
+        self.assertEqual(offline.main(["run", "job.json", "--remote-msa"]), 2)
 
     def test_disable_network_sets_offline_environment(self) -> None:
         code = """

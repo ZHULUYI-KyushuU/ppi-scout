@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Split a complete local bundle into GitHub Release assets and setup zips."""
+"""Build verified local or GitHub Release packages from a complete offline bundle."""
 
 from __future__ import annotations
 
@@ -302,6 +302,60 @@ def write_setup_zips(
             archive.write(windows_ps1, windows_ps1.name)
 
 
+def write_windows_online_setup(
+    output: Path,
+    parts: list[Part],
+    owner: str,
+    repo: str,
+    tag: str,
+) -> Path:
+    """Write the small first-download ZIP used by the Windows release."""
+    manifest = "\n".join(part.tsv() for part in parts)
+    safe_tag = tag.replace("/", "-")
+    destination = output / f"PPI-Scout-Windows-Installer-{safe_tag}.zip"
+    with tempfile.TemporaryDirectory() as tmp_value:
+        tmp = Path(tmp_value)
+        setup = tmp / "setup.ps1"
+        setup.write_text(
+            windows_installer_ps1(manifest, owner, repo, tag),
+            encoding="utf-8-sig",
+        )
+        command = (
+            "@echo off\r\n"
+            "chcp 65001 >nul\r\n"
+            "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass "
+            "-File \"%~dp0setup.ps1\"\r\n"
+            "if errorlevel 1 (\r\n"
+            "  echo.\r\n"
+            "  echo 下载、安装或运行失败，请截图保留上面的红色错误信息。\r\n"
+            "  pause\r\n"
+            "  exit /b 1\r\n"
+            ")\r\n"
+        )
+        chinese_command = tmp / "双击这里下载并安装.cmd"
+        english_command = tmp / "Download-Install-and-Run.cmd"
+        chinese_command.write_text(command, encoding="utf-8")
+        english_command.write_text(command, encoding="utf-8")
+        readme = tmp / "README-FIRST-请先看.txt"
+        readme.write_text(
+            f"""PPI Scout Windows 安装器（{tag}）
+
+1. 第一次使用必须联网，预计下载约 10.4 GB。
+2. 双击“ 双击这里下载并安装.cmd ”。
+3. 程序会自动下载、校验并安装完整离线包，请不要关闭窗口。
+4. 安装完成后，实际预测可以断网运行。
+
+需要 64 位 Windows 10/11、已启用的 WSL2，以及至少 40 GB 可用空间。
+如果中文文件名无法双击，请运行 Download-Install-and-Run.cmd。
+""",
+            encoding="utf-8-sig",
+        )
+        with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
+            for path in (chinese_command, english_command, setup, readme):
+                archive.write(path, path.name)
+    return destination
+
+
 def prepare(args: argparse.Namespace) -> None:
     bundle = args.bundle.expanduser().resolve()
     output = args.output.expanduser().resolve()
@@ -359,6 +413,8 @@ def prepare_windows_artifact(
     tag: str,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     remove_payloads: bool = False,
+    owner: str = "ZHULUYI-KyushuU",
+    repo: str = "ppi-scout",
 ) -> None:
     bundle = bundle.expanduser().resolve()
     output = output.expanduser().resolve()
@@ -384,7 +440,9 @@ def prepare_windows_artifact(
         payload_parts.extend(split_asset(source, target, output, chunk_size))
         if remove_payloads:
             source.unlink()
-    write_windows_local_setup(output, common_parts + payload_parts, tag)
+    parts = common_parts + payload_parts
+    write_windows_local_setup(output, parts, tag)
+    write_windows_online_setup(output, parts, owner, repo, tag)
     (output / "artifact-files.sha256").write_text(
         "".join(
             f"{sha256(path)}  {path.name}\n"
@@ -425,6 +483,8 @@ if __name__ == "__main__":
             arguments.tag,
             arguments.chunk_size,
             arguments.remove_payloads_after_split,
+            arguments.owner,
+            arguments.repo,
         )
     else:
         prepare(arguments)

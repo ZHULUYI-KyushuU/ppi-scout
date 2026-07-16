@@ -9,7 +9,7 @@ RUNTIME_ROOT="$STATE_ROOT/runtime"
 CACHE_ROOT="$STATE_ROOT/boltz-cache"
 JOB="$BUNDLE_ROOT/jobs/current-job.json"
 MSA_LIBRARY="$BUNDLE_ROOT/msas"
-RESULT_ROOT="$BUNDLE_ROOT/results/atg8-yta7-fdfl"
+RESULT_ROOT="$BUNDLE_ROOT/results/atg8-yta7"
 
 fail() {
   echo "错误：$1" >&2
@@ -62,7 +62,7 @@ fi
 BOLTZ_CACHE="$CACHE_ROOT" \
   "$PYTHON" -m ppi_scout.offline \
   --lang zh-CN \
-  run-panel "$JOB" \
+  run "$JOB" \
   --windows 24 \
   --design-seed 7 \
   --msa-library "$MSA_LIBRARY" \

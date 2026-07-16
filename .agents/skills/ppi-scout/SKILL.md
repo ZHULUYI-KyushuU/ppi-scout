@@ -1,144 +1,114 @@
 ---
 name: ppi-scout
-description: Plan, execute, resume, and conservatively interpret reproducible local Boltz protein-complex and motif-peptide screens or explicitly authorized official PaddleHelix HelixFold3 cloud panels. Use when a user supplies protein names, accessions, FASTA files, amino-acid sequences, or a HelixFold3 cloud manifest and needs sequence resolution, optional AIM/LIR candidate scanning, full-length/domain/motif-peptide routing, peptide and control design, local prediction, authorized official-cloud submission, legacy-result import, analysis, an offline HTML result view, or a Chinese, English, or Japanese report.
+description: Plan, run, resume, and conservatively interpret reproducible local Boltz protein-complex or motif-peptide screens, with optional AIM/LIR scanning and explicitly authorized official HelixFold3 cloud panels. Use for protein names, accessions, FASTA files, amino-acid sequences, reviewed PPI Scout jobs, local prediction, control comparison, or offline reports.
 ---
 
 # PPI Scout
 
-## Start the interaction
+## User workflow
 
-- Honor `--lang zh-CN`, `--lang en`, or `--lang ja` when supplied.
-- Otherwise, ask once before scientific intake:
+Use the requested `--lang zh-CN`, `--lang en`, or `--lang ja`. Otherwise ask
+once. Keep sequences, accessions, paths, coordinates, command arguments, and
+metric names unchanged.
 
-  ```text
-  请选择语言 / Choose a language / 言語を選択してください
-  1. 中文  2. English  3. 日本語
-  ```
+PPI Scout has four public commands:
 
-- Continue in the selected language. Keep sequences, accessions, paths, commands, and metric names unchanged.
+1. `ppi-scout doctor` — read-only environment check.
+2. `ppi-scout plan` — verify two inputs and write the authoritative job.
+3. `ppi-scout scan` — optional AIM/LIR sequence scan; never select a hit
+   silently.
+4. `ppi-scout run` — safe dry-run by default; `--live` explicitly starts
+   inference. A reviewed motif job automatically becomes a matched control
+   panel. Rerunning the same command resumes unfinished controls and rewrites
+   the CSV, Markdown, and offline HTML reports.
 
-## Provide operational context
-
-- Use the selected language for workflow guidance while preserving sequences,
-  accessions, paths, commands, and metric names exactly.
-- Before requesting an input, state its purpose, accepted format, default, and
-  whether omission changes execution or scientific interpretation.
-- Before a command, identify the expected artifact or state transition. After
-  execution, report the resulting path and status.
-- Calibrate detail to the user. Keep routine instructions concise; expand
-  routing, MSA, privacy, control design, and result interpretation when the
-  decision has scientific or operational consequences.
-- Prefer `A` for the receptor/reference and `B` for the candidate or
-  motif-bearing partner when that convention fits the question. Explain that
-  A/B are stable chain labels, not evidence of direction and not automatically
-  bait/prey.
-
-## Follow the safe workflow
-
-1. Collect the biological question, both inputs, organism or strain, and any known motif, domain, interface, membrane dependence, or mutation. Do not guess an ambiguous protein identity.
-2. If the user has not already specified whether to scan for AIM/LIR candidates, explicitly ask whether to enable motif scanning; default to no. If enabled, ask whether A or B owns the motif, defaulting to B. Require that owner's resolved sequence.
-3. Run `ppi-scout doctor` before planning. Treat it as read-only; do not install packages or change MSA policy automatically.
-4. Run `ppi-scout plan` before every live run. Default to `--mode auto`; use a manual mode only when the user requests or justifies it.
-5. Review the job plan with the user. Show resolved sequences and coordinates, selected representation, reasons, warnings, peptide controls, MSA mode, external data flow, and output location.
-6. Use `ppi-scout run JOB --dry-run` for one complex, or `ppi-scout run-panel JOB --dry-run` for a reviewed motif-peptide control panel. Both remain dry-run by default. Require an explicit `--live` only after the plan is accepted and any remote-MSA disclosure is resolved.
-7. For a motif panel, rerun the same `run-panel ... --live` command after interruption; it skips completed tasks and automatically regenerates the confidence CSV, Markdown report, and offline `report.html`. Use `ppi-scout resume RUN_ID` for a single-complex run. Never change inputs or settings inside an existing output directory.
-
-Typical sequence:
+Typical local workflow:
 
 ```bash
-ppi-scout --lang zh-CN doctor --format json
-ppi-scout --lang zh-CN plan --fasta-a atg8.fasta --fasta-b atg19.fasta --organism "Saccharomyces cerevisiae S288c" --mode auto -o job.json
-ppi-scout run job.json --output-dir runs/atg8-atg19 --dry-run
-ppi-scout run job.json --output-dir runs/atg8-atg19 --live
-ppi-scout analyze runs/atg8-atg19
-ppi-scout --lang zh-CN report runs/atg8-atg19 -o runs/atg8-atg19/report.md
-# runs/atg8-atg19/report.html is attempted automatically after both run commands
+ppi-scout --lang zh-CN doctor
+ppi-scout --lang zh-CN plan atg8.fasta yta7.fasta \
+  --organism "Saccharomyces cerevisiae S288c" \
+  --motif-owner B --motif-region 53:56 --motif-sequence FDFL \
+  --motif-context disordered --receptor-has-motif-pocket -o job.json
+ppi-scout run job.json --windows 24 --output-dir runs/atg8-yta7 --dry-run
+ppi-scout run job.json --windows 24 --output-dir runs/atg8-yta7 --live
 ```
 
-For a reviewed motif-peptide job, use the deterministic panel executor instead
-of manually rewriting one Boltz input per control:
+After each run, report the real run state and point to `status.json`,
+`confidence_summary.csv`, `report.md`, and `report.html`. Tell the user that
+`report.html` opens by double-clicking. Never treat a renderer failure as a
+Boltz failure.
+
+## Intake and planning
+
+- Collect the question, two exact inputs, organism/strain, and known motif,
+  domain, interface, membrane dependence, or mutation.
+- Prefer A for the receptor/reference and B for the candidate or motif-bearing
+  partner when appropriate. A/B are stable labels, not evidence of binding or
+  automatic bait/prey assignments.
+- Do not guess an ambiguous protein identity.
+- Run `doctor`, then `plan`, then review exact sequences, coordinates, route,
+  controls, MSA policy, external data flow, output path, and compute cost.
+- Keep dry-run as the default. Use `--live` only after explicit acceptance.
+
+For representation decisions, read
+[`routing-rules.md`](references/routing-rules.md). Never choose a peptide only
+because a protein is long. Use `needs_review` when identity, coordinates,
+membrane context, or structural evidence is insufficient.
+
+## AIM/LIR projects
+
+Read [`aim-lir-rules.md`](references/aim-lir-rules.md). Scanning is opt-in and
+requires an exact sequence:
 
 ```bash
-ppi-scout run-panel job.json --windows 24 --output-dir runs/atg8-motif --dry-run
-ppi-scout run-panel job.json --windows 24 --output-dir runs/atg8-motif --live
+ppi-scout scan --fasta yta7.fasta
+ppi-scout scan --fasta yta7.fasta --design-candidate CANDIDATE_ID
 ```
 
-Treat the second command as the single explicit resource-use confirmation. It
-generates every independent WT/control input, streams live Boltz progress,
-resumes unfinished variants, analyzes confidence files, and writes
-`panel.json`, `plan.json`, `confidence_summary.csv`, `report.md`, and
-`report.html`. Default to single-sequence `msa: empty`. Use
-`--receptor-msa PATH` for an audited local MSA or `--remote-msa` only after
-explicit sequence-upload permission. On Apple Silicon, leave
-`--accelerator auto`; it selects the MPS-backed GPU path and disables
-unsupported specialized kernels.
+Report every canonical `[WFY]xx[LIV]` match and its transparent sequence-only
+rank. Explain that scanning cannot establish accessibility, disorder,
+topology, function, or binding. Record the selected motif owner, 1-based
+inclusive coordinates, exact core, context, and receptor-pocket evidence in
+the job. Generate nested WT peptides and matched anchor, `AAAA`, reverse,
+flank-scramble, and composition-matched controls; never test only the
+four-residue core.
 
-## Run an authorized official HelixFold3 cloud panel
+## Local Boltz execution
 
-For an explicitly requested PaddleHelix HelixFold3 cloud workflow, read
-[helixfold3-cloud.md](references/helixfold3-cloud.md) before validating inputs,
-opening the provider page, submitting jobs, monitoring, downloading, or
-reporting. Treat the supplied manifest as the exact submission boundary. Do
-not silently convert a local Boltz plan into a remote submission or substitute
-another provider or model.
+Read [`boltz-local.md`](references/boltz-local.md) before installation or live
+execution and [`troubleshooting.md`](references/troubleshooting.md) after a
+failure. Default to single-sequence offline mode. Use `--receptor-msa FILE` for
+one audited local MSA, or `--msa-library DIR` for exact-sequence lookup.
+`--remote-msa` is explicit authorization to send sequences externally.
 
-For a sequence-resolved motif hypothesis, record its owner, coordinates, and
-context in the plan rather than leaving them only in chat:
+Never change scientific inputs or settings inside an existing output folder.
+Use a new job/output folder when parameters change.
 
-```bash
-ppi-scout plan --fasta-a atg8.fasta --fasta-b atg19.fasta --mode auto \
-  --motif-owner B --motif-region 412:415 --motif-sequence WEEL \
-  --motif-context exposed --receptor-has-motif-pocket -o job.json
-```
+## Cloud execution
 
-## Route the biological representation
+Only after explicit authorization, read
+[`helixfold3-cloud.md`](references/helixfold3-cloud.md) and treat the supplied
+manifest as the exact submission boundary. Use only the official PaddleHelix
+service. Never request or expose credentials, invent an API contract, combine
+control peptides into one complex, or claim submission without a durable
+provider job ID or result URL.
 
-- Select `full_length` for complete proteins when the question concerns their folded, whole-protein interaction and no better localized evidence exists.
-- Select `domain` when a supported interface lies in a folded domain or full-length context would add unrelated domains or unresolved regions.
-- Select `motif_peptide` only for a localized linear-motif hypothesis with a plausible receptor pocket and accessible sequence context.
-- Select `needs_review` when identity, coordinates, membrane context, or structural evidence is insufficient or contradictory.
-- Never turn a long protein into a peptide solely because it is long. A short biologically complete protein can still require full-length modeling.
+## Privacy and interpretation
 
-Read [routing-rules.md](references/routing-rules.md) before finalizing `auto` routing.
+Read [`interpretation-guardrails.md`](references/interpretation-guardrails.md)
+before interpreting results.
 
-## Design AIM/LIR panels
+- Never present ipTM, protein_ipTM, pLDDT, rank score, confidence score, or a
+  predicted pose as proof of binding.
+- Never use Boltz small-molecule affinity outputs for protein–protein or
+  protein–peptide affinity.
+- Compare WT and controls under matched settings and label conclusions as
+  structural-model support, ambiguity, or lack of support.
+- Do not externally submit unpublished, proprietary, patient-derived, or
+  otherwise sensitive sequences without explicit permission.
+- Never commit credentials, private sequences, MSA/model caches, provider raw
+  output, or run directories.
 
-For Atg8/LC3/GABARAP questions, read [aim-lir-rules.md](references/aim-lir-rules.md). Use 1-based inclusive coordinates at the CLI boundary. Generate nested WT windows and matched anchor-mutant and scramble controls; never test only the four-residue core.
-
-Scanning is disabled unless the user opts in. When enabled, report every
-canonical `[WFY]xx[LIV]` match and its transparent sequence-only ranking.
-Explain that the scanner cannot infer accessibility, disorder, topology, or
-function. Ask which candidate IDs to design; a blank answer means design none.
-Never select a candidate silently.
-Treat `aim-NNN` as a position-based candidate ID, not its priority rank. Use
-the separate `rank` field when discussing sequence-only priority.
-
-```bash
-ppi-scout scan-motifs --fasta atg19.fasta
-ppi-scout scan-motifs --fasta atg19.fasta --design-candidate CANDIDATE_ID
-```
-
-```bash
-ppi-scout design-peptides \
-  --fasta atg19.fasta \
-  --motif 412:415 \
-  --windows 16,24,34 \
-  --seed 7 \
-  -o peptide-panel.json
-```
-
-## Protect interpretation and privacy
-
-- Read [interpretation-guardrails.md](references/interpretation-guardrails.md) before analyzing or reporting.
-- Never present ipTM, protein_ipTM, confidence score, rank score, or a predicted pose as proof that two molecules bind.
-- Never use the Boltz affinity module or affinity outputs for protein-protein or protein-peptide affinity; it is a small-molecule-to-protein module.
-- Compare WT and controls only under matched settings, inspect the expected interface, and label conclusions as structural-model support, ambiguity, or lack of support.
-- Treat `--use_msa_server` as sequence disclosure to a remote service. Do not send unpublished, proprietary, patient-derived, or otherwise sensitive sequences without explicit permission. Prefer a local/precomputed MSA or `msa: empty` when disclosure is not allowed, and document the accuracy tradeoff.
-- After every `run`, `run-panel`, or `resume`, tell the user that PPI Scout automatically attempts the run directory's self-contained `report.html` and that it can be opened by double-clicking. A visualization failure is not a Boltz failure: inspect and explain the run-status fields and `status.json` separately from visualization status or warnings.
-- Use `ppi-scout --lang LANGUAGE visualize RUN_OR_JSON` manually only to regenerate a page or visualize a scan/job JSON. A run directory produces `report.html`; a JSON file produces `<source-stem>-report.html`. Explain every section, state clearly when no confidence files exist, and never turn a bar length or high score into a binding claim.
-
-Read [boltz-local.md](references/boltz-local.md) before Boltz installation or
-live execution and [troubleshooting.md](references/troubleshooting.md) when a
-check or run fails. Use [job-template.json](assets/job-template.json) as a
-human-auditable starting point; let `ppi-scout plan` produce the authoritative
-executable job.
+Use [`job-template.json`](assets/job-template.json) only as a starting point;
+the job produced by `ppi-scout plan` is authoritative.

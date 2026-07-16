@@ -1,3 +1,4 @@
+# PPI Scout offline bootstrap for Windows WSL2.
 param(
     [Parameter(Mandatory = $true)]
     [string]$BundleRoot
@@ -40,7 +41,7 @@ Write-Host "[3/3] 开始或续跑完全本地的 Boltz 面板……"
 wsl.exe -d $Distro -u root -- bash "$LinuxBundleRoot/windows-wsl2-x64/install-and-run.sh" "$LinuxBundleRoot"
 if ($LASTEXITCODE -ne 0) { Fail "本地预测未成功完成，请查看 results 目录中的 launcher.log。" }
 
-$Report = Join-Path $BundleRoot "results\atg8-yta7-fdfl\report.html"
+$Report = Join-Path $BundleRoot "results\atg8-yta7\report.html"
 if (Test-Path $Report -PathType Leaf) {
     Start-Process $Report
     Write-Host "完成：$Report" -ForegroundColor Green

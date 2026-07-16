@@ -1,4 +1,4 @@
-# Official HelixFold3 cloud execution
+# Optional HelixFold3 cloud workflow
 
 This repository supports a tightly scoped handoff for authorized protein
 complex panels on the official PaddleHelix HelixFold3 cloud service. It does

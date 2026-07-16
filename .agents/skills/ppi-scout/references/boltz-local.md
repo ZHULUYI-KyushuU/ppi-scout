@@ -50,8 +50,8 @@ dry-run unless `--live` is supplied. Users can double-click this self-contained
 HTML file; a local web server is not required. Treat page generation as a
 separate presentation step: failure to generate HTML does not establish that
 Boltz failed. Check the run status and `status.json` separately from any
-visualization status or warning. Use manual `visualize` only to regenerate a
-page or render a scan/job JSON.
+visualization status or warning. Rerun the same PPI Scout command to regenerate
+the reports without changing the reviewed job.
 
 PPI Scout compiles the upstream form:
 
@@ -59,12 +59,12 @@ PPI Scout compiles the upstream form:
 boltz predict INPUT.yaml --out_dir OUTPUT_DIR
 ```
 
-For a reviewed `motif_peptide` job, use `run-panel` to compile and execute all
-matched controls without manually creating separate inputs:
+For a reviewed `motif_peptide` job, `run` automatically compiles and executes
+all matched controls without manually creating separate inputs:
 
 ```bash
-ppi-scout run-panel job.json --windows 24 --output-dir runs/JOB_NAME-panel --dry-run
-ppi-scout run-panel job.json --windows 24 --output-dir runs/JOB_NAME-panel --live
+ppi-scout run job.json --windows 24 --output-dir runs/JOB_NAME --dry-run
+ppi-scout run job.json --windows 24 --output-dir runs/JOB_NAME --live
 ```
 
 The live form streams Boltz output and automatically skips completed variants
@@ -94,9 +94,12 @@ Never switch from local or single-sequence mode to a remote service after a fail
 - Keep WT and every control under the same model, MSA, template, sampling, and output settings.
 - Use `--override` only when intentionally invalidating cached preprocessing or predictions; record why.
 
-## Resume and import
+## Resume safely
 
-Use `ppi-scout resume RUN_ID` to inspect continuation of the recorded job without changing its scientific inputs; add `--live` only to explicitly execute the resumed prediction. Both forms automatically attempt `RUN_ID/report.html`. If parameters must change, create a new planned job with a new name. Use `ppi-scout import-legacy SOURCE -o job.json` for older results, mark missing provenance fields as unknown, then analyze without inventing them.
+Rerun the same `ppi-scout run JOB --output-dir RUN_ID --live` command to skip
+completed motif controls and continue unfinished work. Do not change the job or
+settings inside an existing output folder. If parameters must change, create a
+new planned job with a new name and output folder.
 
 Upstream references:
 
