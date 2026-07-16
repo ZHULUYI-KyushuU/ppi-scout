@@ -15,7 +15,7 @@
   "mode_guidance": "Choose how the proteins should be represented when planning full-length, domain, or motif-peptide work. Use auto unless another representation is already justified; blank is allowed and defaults to auto. This is a computational route, not a biological conclusion, and motif-peptide does not prove motif binding.",
   "mode_prompt": "Analysis mode [auto/full-length/domain/motif-peptide] (default: auto): ",
   "invalid_mode": "Unknown mode; using auto.",
-  "job_created": "Job plan created. The complete JSON is printed next; save it with `ppi-scout > job.json` before a dry-run or result view, then use `ppi-scout visualize job.json`. Printed output alone is not a completed prediction.",
+  "job_created": "Job plan created. The complete JSON is printed next; save it with `ppi-scout > job.json`, then use `ppi-scout run job.json`. Printed output alone is not a completed prediction.",
   "output_written": "Saved to {path}",
   "yaml_fallback": "PyYAML is not installed; emitting JSON instead.",
   "error_prefix": "Error",

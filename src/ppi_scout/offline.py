@@ -1,4 +1,4 @@
-"""Hard-offline entry point for portable PPI Scout bundles."""
+"""Hard-offline entry point for PPI Scout packages."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from typing import NoReturn, Sequence
 
 
 class NetworkDisabledError(OSError):
-    """Raised when a portable offline run attempts an IP network operation."""
+    """Raised when an offline run attempts an IP network operation."""
 
 
 _ORIGINAL_SOCKET = socket.socket
@@ -18,7 +18,7 @@ _NETWORK_DISABLED = False
 
 
 def _blocked(*_args: object, **_kwargs: object) -> NoReturn:
-    raise NetworkDisabledError(errno.ENETDOWN, "PPI Scout portable offline mode blocks network access")
+    raise NetworkDisabledError(errno.ENETDOWN, "PPI Scout offline mode blocks network access")
 
 
 class _OfflineSocket(_ORIGINAL_SOCKET):

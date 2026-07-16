@@ -2,14 +2,14 @@
 set -euo pipefail
 
 BUNDLE_ROOT="${1:?bundle root is required}"
-VERSION="0.4.0"
+VERSION="0.5.0"
 STATE_ROOT="/opt/ppi-scout-offline/$VERSION"
 RUNTIME_ARCHIVE="$BUNDLE_ROOT/windows-wsl2-x64/ppi-scout-runtime-linux-x86_64.tar.gz"
 RUNTIME_ROOT="$STATE_ROOT/runtime"
 CACHE_ROOT="$STATE_ROOT/boltz-cache"
 JOB="$BUNDLE_ROOT/jobs/current-job.json"
 MSA_LIBRARY="$BUNDLE_ROOT/msas"
-RESULT_ROOT="$BUNDLE_ROOT/results/atg8-yta7-fdfl"
+RESULT_ROOT="$BUNDLE_ROOT/results/atg8-yta7"
 
 fail() {
   echo "错误：$1" >&2
@@ -62,7 +62,7 @@ fi
 BOLTZ_CACHE="$CACHE_ROOT" \
   "$PYTHON" -m ppi_scout.offline \
   --lang zh-CN \
-  run-panel "$JOB" \
+  run "$JOB" \
   --windows 24 \
   --design-seed 7 \
   --msa-library "$MSA_LIBRARY" \

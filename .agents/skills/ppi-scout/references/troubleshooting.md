@@ -14,7 +14,7 @@ Keep failures explicit. Do not repair them by changing the biological route, seq
 | Remote MSA is blocked or not permitted | Job `privacy` and `execution.remote_msa` | Use an approved local/precomputed MSA or `msa: empty`; document the accuracy tradeoff. |
 | Remote MSA authentication fails | Secret source and server configuration | Keep credentials in environment variables or approved secret storage; never paste them into job JSON or logs. |
 | Boltz input is rejected | Unique chain IDs, amino-acid alphabet, YAML, MSA paths | Run `ppi-scout run JOB --dry-run`, inspect the compiled input, and correct the plan rather than editing run artifacts. |
-| Run is interrupted | Run ID, manifest, logs, cached outputs | Use `ppi-scout resume RUN_ID`. Create a new job if scientific parameters must change. |
+| Run is interrupted | Job, output directory, manifest, logs, cached outputs | Rerun the identical `ppi-scout run JOB --output-dir RUN_ID --live` command. Create a new job if scientific parameters must change. |
 | No confidence JSON is found | Run completion and output path | Preserve the incomplete status; inspect logs and resume. Do not report a negative biological result. |
 | WT and controls all score highly | Expected pocket, clashes, window choice, MSA sensitivity | Label specificity ambiguous and inspect matched structures; do not claim binding from ipTM. |
 | Affinity files appear in a PPI result | Imported or incorrectly configured run | Ignore affinity values for PPI/peptide interpretation and remove affinity from the next planned input. |

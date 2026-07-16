@@ -1,6 +1,6 @@
-# PPI Scout offline bundles
+# PPI Scout offline package
 
-The portable bundle has two platform launchers and one shared, immutable model
+The offline package has two platform launchers and one shared, immutable model
 payload. Runtime inference never needs Codex, ChatGPT, a browser, an MSA
 service, Hugging Face, or any other network service.
 
@@ -10,7 +10,7 @@ service, Hugging Face, or any other network service.
 PPI-Scout-Offline/
   Run-PPI-Scout-macOS.command
   Run-PPI-Scout-Windows.cmd
-  checksums.sha256
+  BUNDLE-SHA256SUMS
   jobs/current-job.json
   msas/<receptor-sequence-sha256>.a3m
   models/{mols.tar,boltz2_conf.ckpt,boltz2_aff.ckpt,SHA256SUMS}
@@ -39,6 +39,6 @@ present, execution stays offline and falls back to single-sequence mode.
 ## Release packaging
 
 GitHub Release assets must each be under 2 GiB, so large files are split into
-ordered parts by `scripts/prepare_offline_release.py`. Bootstrap launchers
+ordered parts by `scripts/build_offline_package.py`. Bootstrap launchers
 download all parts once, verify every SHA-256, reconstruct the bundle, and then
 hand control to the platform-specific offline launcher.

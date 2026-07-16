@@ -1,4 +1,4 @@
-# Local receptor MSA library
+# Optional local receptor MSA files
 
 Put optional receptor A3M files here using this exact filename:
 

@@ -1,6 +1,6 @@
-# Pinned Boltz 2 model payload
+# Verified Boltz 2 model files
 
-The portable v0.4.0 bundle uses the files downloaded by Boltz 2.2.1:
+The v0.5.0 offline package uses the files downloaded by Boltz 2.2.1:
 
 - `mols.tar`
 - `boltz2_conf.ckpt`

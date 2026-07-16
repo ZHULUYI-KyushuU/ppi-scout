@@ -61,7 +61,7 @@ When the user specifies one motif, test it directly and state any contextual war
 
 After displaying the complete candidate table, ask for comma-separated
 candidate IDs. A blank response means design none. Use
-`ppi-scout scan-motifs --fasta PROTEIN.fasta` to inspect candidates, and add
+`ppi-scout scan --fasta PROTEIN.fasta` to inspect candidates, and add
 `--design-candidate CANDIDATE_ID` only after explicit selection.
 
 For WT-versus-control interpretation, use [interpretation-guardrails.md](interpretation-guardrails.md). Failure of WT to separate from anchor mutants and matched scrambles means motif specificity is not established, even if every model has high confidence.

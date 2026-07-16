@@ -88,22 +88,22 @@ def build_panel_manifest(
 
     route = str(job.get("routing", {}).get("route", "")).replace("-", "_")
     if route != "motif_peptide":
-        raise ValueError("run-panel requires a reviewed job with routing.route=motif_peptide.")
+        raise ValueError("run requires a reviewed job with routing.route=motif_peptide.")
     proteins = job.get("inputs", {}).get("proteins", [])
     if not isinstance(proteins, list) or len(proteins) != 2:
-        raise ValueError("run-panel requires exactly two resolved protein inputs.")
+        raise ValueError("run requires exactly two resolved protein inputs.")
 
     hypothesis = job.get("hypothesis")
     if not isinstance(hypothesis, dict):
-        raise ValueError("run-panel requires a recorded motif hypothesis.")
+        raise ValueError("run requires a recorded motif hypothesis.")
     motif_owner = str(hypothesis.get("motif_owner", "")).upper()
     if motif_owner not in {"A", "B"}:
         raise ValueError("The motif hypothesis must identify motif_owner as A or B.")
     by_id = {str(item.get("id", "")).upper(): item for item in proteins}
     if set(by_id) != {"A", "B"}:
-        raise ValueError("run-panel requires unique protein chain IDs A and B.")
+        raise ValueError("run requires unique protein chain IDs A and B.")
     if any(not item.get("sequence") for item in proteins):
-        raise ValueError("run-panel requires exact sequences for both proteins.")
+        raise ValueError("run requires exact sequences for both proteins.")
 
     raw_region = hypothesis.get("motif_region")
     if not isinstance(raw_region, (list, tuple)) or len(raw_region) != 2:

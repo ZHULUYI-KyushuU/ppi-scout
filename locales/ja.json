@@ -15,7 +15,7 @@
   "mode_guidance": "全長・ドメイン・モチーフペプチドのどの表現で計画するかを選びます。別の表現を支持する根拠がない場合は auto を使用し、空欄でも既定の auto になります。これは計算ルートであって生物学的結論ではなく、motif-peptide を選んでも結合の証明にはなりません。",
   "mode_prompt": "解析モード [auto/full-length/domain/motif-peptide]（既定: auto）：",
   "invalid_mode": "モードを認識できないため、auto を使用します。",
-  "job_created": "ジョブ計画を作成しました。完全なJSONは次に表示されます。dry-runや結果ページの前に `ppi-scout > job.json` で保存し、`ppi-scout visualize job.json` を使用してください。表示だけでは予測完了ではありません。",
+  "job_created": "ジョブ計画を作成しました。完全なJSONは次に表示されます。`ppi-scout > job.json` で保存してから `ppi-scout run job.json` を使用してください。表示だけでは予測完了ではありません。",
   "output_written": "{path} に保存しました",
   "yaml_fallback": "PyYAML が未インストールのため、JSONを出力します。",
   "error_prefix": "エラー",

@@ -48,24 +48,14 @@ class CLITests(unittest.TestCase):
                     exit_code = main(argv)
         return exit_code, stdout.getvalue(), stderr.getvalue()
 
-    def test_parser_exposes_complete_command_surface(self) -> None:
+    def test_parser_exposes_only_the_four_user_commands(self) -> None:
         help_text = build_parser().format_help()
-        for command in (
-            "doctor",
-            "plan",
-            "design-peptides",
-            "scan-motifs",
-            "run",
-            "run-panel",
-            "resume",
-            "analyze",
-            "report",
-            "visualize",
-            "import-legacy",
-        ):
+        for command in ("doctor", "plan", "scan", "run"):
             self.assertIn(command, help_text)
+        for removed in ("run-panel", "resume", "analyze", "visualize", "import-legacy"):
+            self.assertNotIn(removed, help_text)
 
-    def test_run_panel_dry_run_prepares_all_controls_and_reports(self) -> None:
+    def test_run_detects_motif_job_and_prepares_all_controls_and_reports(self) -> None:
         job = {
             "schema_version": "1.0",
             "name": "atg8-yta7-fdfl",
@@ -110,7 +100,7 @@ class CLITests(unittest.TestCase):
                 [
                     "--lang",
                     "zh-CN",
-                    "run-panel",
+                    "run",
                     str(job_path),
                     "--windows",
                     "24",
@@ -207,49 +197,6 @@ class CLITests(unittest.TestCase):
         self.assertEqual(exit_code, 2)
         self.assertIn("does not match", stderr)
 
-    def test_design_peptides_uses_one_based_inclusive_coordinates(self) -> None:
-        sequence = "MSTYQQVADKWQQLDEESGKNPTA"
-        exit_code, stdout, _ = self.run_cli(
-            [
-                "design-peptides",
-                "--sequence",
-                sequence,
-                "--motif",
-                "11:14",
-                "--windows",
-                "16,24",
-                "--seed",
-                "7",
-            ]
-        )
-
-        self.assertEqual(exit_code, 0)
-        payload = json.loads(stdout)
-        self.assertEqual(payload["coordinate_system"], "1-based inclusive")
-        self.assertEqual(
-            payload["motif"],
-            {"sequence": "WQQL", "start_1based": 11, "end_1based": 14},
-        )
-        self.assertEqual(payload["window_sizes"], [16, 24])
-        self.assertEqual(payload["seed"], 7)
-
-    def test_design_peptides_can_locate_unique_motif(self) -> None:
-        exit_code, stdout, _ = self.run_cli(
-            [
-                "design-peptides",
-                "--sequence",
-                "MSTYQQVADKWQQLDEESGKNPTA",
-                "--motif-sequence",
-                "WQQL",
-                "--windows",
-                "16",
-            ]
-        )
-        self.assertEqual(exit_code, 0)
-        payload = json.loads(stdout)
-        self.assertEqual(payload["motif"]["start_1based"], 11)
-        self.assertEqual(payload["motif"]["end_1based"], 14)
-
     def test_interactive_start_asks_language_then_two_proteins(self) -> None:
         exit_code, stdout, _ = self.run_cli(
             [],
@@ -286,7 +233,7 @@ class CLITests(unittest.TestCase):
         fake_module = SimpleNamespace(scan_aim_lir=self.fake_scan)
         with patch.dict("sys.modules", {"ppi_scout.motif_scan": fake_module}):
             exit_code, stdout, _ = self.run_cli(
-                ["scan-motifs", "--sequence", self.SCAN_SEQUENCE]
+                ["scan", "--sequence", self.SCAN_SEQUENCE]
             )
 
         self.assertEqual(exit_code, 0)
@@ -298,7 +245,7 @@ class CLITests(unittest.TestCase):
 
     def test_real_scanner_integrates_with_cli_and_reports_all_atg19_hits(self) -> None:
         exit_code, stdout, _ = self.run_cli(
-            ["scan-motifs", "--sequence", self.SCAN_SEQUENCE]
+            ["scan", "--sequence", self.SCAN_SEQUENCE]
         )
 
         self.assertEqual(exit_code, 0)
@@ -316,7 +263,7 @@ class CLITests(unittest.TestCase):
         with patch.dict("sys.modules", {"ppi_scout.motif_scan": fake_module}):
             exit_code, stdout, _ = self.run_cli(
                 [
-                    "scan-motifs",
+                    "scan",
                     "--sequence",
                     self.SCAN_SEQUENCE,
                     "--windows",
@@ -436,7 +383,15 @@ class CLITests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             result = json.loads(stdout)
             self.assertEqual(result["status"], "dry_run")
-            for filename in ("job.json", "resolved_input.yaml", "plan.json", "status.json", "report.html"):
+            for filename in (
+                "job.json",
+                "resolved_input.yaml",
+                "plan.json",
+                "status.json",
+                "confidence_summary.csv",
+                "report.md",
+                "report.html",
+            ):
                 self.assertTrue((run_dir / filename).is_file(), filename)
             self.assertEqual(result["visualization"]["status"], "complete")
             self.assertEqual(result["visualization"]["path"], str(run_dir / "report.html"))
@@ -444,16 +399,6 @@ class CLITests(unittest.TestCase):
             saved_job = json.loads((run_dir / "job.json").read_text(encoding="utf-8"))
             self.assertFalse(saved_job["privacy"]["sequence_upload_authorized"])
             self.assertNotIn("--use_msa_server", result["argv"])
-
-            report_code, report_stdout, _ = self.run_cli(["report", str(run_dir)])
-            self.assertEqual(report_code, 0)
-            self.assertTrue((run_dir / "report.md").is_file())
-            self.assertEqual(json.loads(report_stdout)["status"], "complete")
-
-            visual_code, visual_stdout, _ = self.run_cli(["visualize", str(run_dir)])
-            self.assertEqual(visual_code, 0)
-            self.assertTrue((run_dir / "report.html").is_file())
-            self.assertTrue(json.loads(visual_stdout)["offline"])
 
     def test_automatic_visualization_failure_does_not_mask_dry_run(self) -> None:
         job = {
@@ -627,96 +572,6 @@ class CLITests(unittest.TestCase):
             self.assertEqual(saved_status["visualization"]["status"], "complete")
             self.assertTrue((run_dir / "report.html").is_file())
             self.assertIn("Duplicate", (run_dir / "report.html").read_text(encoding="utf-8"))
-
-    def test_visualize_scan_json_without_running_boltz(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            scan_path = root / "atg19-scan.json"
-            scan_path.write_text(
-                json.dumps(
-                    {
-                        "kind": "aim_lir_scan",
-                        "candidates": [
-                            {
-                                "candidate_id": "aim-002",
-                                "core_sequence": "WQQL",
-                                "start_1based": 11,
-                                "end_1based": 14,
-                                "rank": 1,
-                                "sequence_score": 9.0,
-                            }
-                        ],
-                        "designed_candidate_ids": [],
-                        "peptide_panels": [],
-                    }
-                ),
-                encoding="utf-8",
-            )
-
-            exit_code, stdout, _ = self.run_cli(
-                ["--lang", "zh-CN", "visualize", str(scan_path)]
-            )
-
-            self.assertEqual(exit_code, 0)
-            destination = root / "atg19-scan-report.html"
-            self.assertTrue(destination.is_file())
-            self.assertIn("PPI Scout 本地结果页", destination.read_text(encoding="utf-8"))
-            self.assertIn("aim-002", destination.read_text(encoding="utf-8"))
-            self.assertTrue(json.loads(stdout)["offline"])
-
-            replace_code, _, replace_stderr = self.run_cli(
-                ["visualize", str(scan_path), "-o", str(scan_path)]
-            )
-            self.assertEqual(replace_code, 2)
-            self.assertIn("must not replace", replace_stderr)
-
-    def test_visualize_handles_malformed_nested_job_shapes(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            job_path = root / "odd-job.json"
-            job_path.write_text(
-                json.dumps({"name": "odd", "inputs": None, "routing": None, "execution": None}),
-                encoding="utf-8",
-            )
-
-            exit_code, _, stderr = self.run_cli(["visualize", str(job_path)])
-
-            self.assertEqual(exit_code, 0, stderr)
-            self.assertTrue((root / "odd-job-report.html").is_file())
-
-    def test_resume_preserves_recorded_remote_msa_and_output_format(self) -> None:
-        job = {
-            "schema_version": "1.0",
-            "name": "resume-smoke",
-            "inputs": {
-                "proteins": [
-                    {"id": "A", "sequence": "ACDEFGHIKLMNPQRSTVWY"},
-                    {"id": "B", "sequence": "YWVTSRQPNMLKIHGFEDCA"},
-                ]
-            },
-            "execution": {
-                "backend": "boltz2",
-                "status": "failed",
-                "remote_msa": True,
-                "output_format": "mmcif",
-            },
-            "privacy": {"sequence_upload_authorized": True},
-        }
-        with tempfile.TemporaryDirectory() as temporary:
-            run_dir = Path(temporary)
-            (run_dir / "job.json").write_text(json.dumps(job), encoding="utf-8")
-            (run_dir / "report.html").write_text("stale report", encoding="utf-8")
-
-            exit_code, stdout, _ = self.run_cli(["resume", str(run_dir), "--dry-run"])
-
-            self.assertEqual(exit_code, 0)
-            payload = json.loads(stdout)
-            self.assertIn("--use_msa_server", payload["argv"])
-            self.assertTrue((run_dir / "report.html").is_file())
-            self.assertEqual(payload["visualization"]["status"], "complete")
-            self.assertNotIn("stale report", (run_dir / "report.html").read_text(encoding="utf-8"))
-            format_index = payload["argv"].index("--output_format")
-            self.assertEqual(payload["argv"][format_index + 1], "mmcif")
 
     def test_language_aliases_and_translations(self) -> None:
         self.assertEqual(normalize_language("中文"), "zh-CN")

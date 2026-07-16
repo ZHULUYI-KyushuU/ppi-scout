@@ -164,9 +164,12 @@ class Boltz2Backend:
             output_parts: list[str] = []
             try:
                 if process.stdout is not None:
-                    for line in process.stdout:
-                        output_parts.append(line)
-                        print(line, end="", file=sys.stderr, flush=True)
+                    try:
+                        for line in process.stdout:
+                            output_parts.append(line)
+                            print(line, end="", file=sys.stderr, flush=True)
+                    finally:
+                        process.stdout.close()
                 returncode = process.wait()
             except KeyboardInterrupt:
                 process.terminate()

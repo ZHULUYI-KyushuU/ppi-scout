@@ -15,7 +15,7 @@
   "mode_guidance": "请选择蛋白的计算表示方式，用于规划全长、结构域或 motif 短肽任务。若没有其他已获证据支持的表示方式，请使用 auto；可以留空，默认 auto。这里选择的是计算路线，不是生物学结论；选择 motif-peptide 也不能证明 motif 会结合。",
   "mode_prompt": "分析模式 [auto/full-length/domain/motif-peptide]（默认 auto）：",
   "invalid_mode": "无法识别该模式，将使用 auto。",
-  "job_created": "任务计划已生成。完整 JSON 接下来会输出到终端；若要继续 dry-run 或生成结果页，请先用 `ppi-scout > job.json` 将它保存，再运行 `ppi-scout visualize job.json`。不要把终端里一闪而过的内容误认为已经正式预测。",
+  "job_created": "任务计划已生成。完整 JSON 接下来会输出到终端；请先用 `ppi-scout > job.json` 保存，再运行 `ppi-scout run job.json`。不要把终端里一闪而过的内容误认为已经正式预测。",
   "output_written": "已保存至 {path}",
   "yaml_fallback": "未安装 PyYAML，将改为输出 JSON。",
   "error_prefix": "错误",

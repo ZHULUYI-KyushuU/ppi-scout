@@ -364,16 +364,6 @@ def _parse_windows(raw: str) -> tuple[int, ...]:
     return tuple(dict.fromkeys(values))
 
 
-def _parse_motif_coordinates(raw: str, sequence_length: int) -> tuple[int, int]:
-    match = re.fullmatch(r"\s*(\d+)\s*[:\-]\s*(\d+)\s*", raw)
-    if not match:
-        raise CLIError("--motif uses 1-based inclusive START:END coordinates, for example 412:415.")
-    start, end = (int(match.group(1)), int(match.group(2)))
-    if start < 1 or end < start or end > sequence_length:
-        raise CLIError(f"Motif coordinates must be within 1:{sequence_length} and START <= END.")
-    return start, end
-
-
 def _parse_unbounded_region(raw: str) -> tuple[int, int]:
     match = re.fullmatch(r"\s*(\d+)\s*[:\-]\s*(\d+)\s*", raw)
     if not match:
@@ -382,15 +372,6 @@ def _parse_unbounded_region(raw: str) -> tuple[int, int]:
     if start < 1 or end < start:
         raise CLIError("--motif-region requires START >= 1 and START <= END.")
     return start, end
-
-
-def _find_motif(sequence: str, motif: str) -> tuple[int, int]:
-    clean = _clean_sequence(motif, source="motif")
-    starts = [match.start() for match in re.finditer(f"(?={re.escape(clean)})", sequence)]
-    if len(starts) != 1:
-        raise CLIError("The motif sequence must occur exactly once; use --motif START:END when ambiguous.")
-    start = starts[0] + 1
-    return start, start + len(clean) - 1
 
 
 def _fallback_peptide_panel(
@@ -528,7 +509,7 @@ def _scan_and_design_motifs(
         raise CLIError(
             "Unknown motif candidate ID(s): "
             + ", ".join(unknown)
-            + ". Run scan-motifs without design options to list valid IDs."
+            + ". Run `ppi-scout scan` without design options to list valid IDs."
         )
 
     panels: list[dict[str, Any]] = []
@@ -682,29 +663,6 @@ def _command_plan(args: argparse.Namespace, translator: Translator) -> int:
     return 0
 
 
-def _command_design(args: argparse.Namespace, translator: Translator) -> int:
-    if bool(args.sequence) == bool(args.fasta):
-        raise CLIError(translator.t("sequence_required") + " Choose exactly one of --sequence or --fasta.")
-    sequence = _clean_sequence(args.sequence, source="sequence") if args.sequence else _read_fasta(args.fasta)
-    if args.motif and args.motif_sequence:
-        raise CLIError("Choose --motif or --motif-sequence, not both.")
-    if args.motif:
-        start, end = _parse_motif_coordinates(args.motif, len(sequence))
-    elif args.motif_sequence:
-        start, end = _find_motif(sequence, args.motif_sequence)
-    else:
-        raise CLIError(translator.t("motif_required"))
-    payload = design_panel(
-        sequence,
-        start,
-        end,
-        windows=_parse_windows(args.windows),
-        seed=args.seed,
-    )
-    _emit(payload, requested_format=args.format, output=args.output, translator=translator)
-    return 0
-
-
 def _command_scan_motifs(args: argparse.Namespace, translator: Translator) -> int:
     if bool(args.sequence) == bool(args.fasta):
         raise CLIError(translator.t("sequence_required") + " Choose exactly one of --sequence or --fasta.")
@@ -757,7 +715,7 @@ def _finalize_run_artifacts(
     *,
     language: str | None = None,
 ) -> dict[str, Any]:
-    """Write final state and best-effort offline HTML without masking run status."""
+    """Write status, CSV, Markdown, and HTML without masking the run outcome."""
 
     underlying_status = str(status.get("status", "unknown"))
     execution = run_job.get("execution", {})
@@ -780,8 +738,11 @@ def _finalize_run_artifacts(
     try:
         temporary_destination.unlink(missing_ok=True)
         analysis = importlib.import_module("ppi_scout.analysis")
+        reporting = importlib.import_module("ppi_scout.reporting")
         visualization = importlib.import_module("ppi_scout.visualization")
         rows = analysis.collect_confidence_files(output_dir)
+        summary_path = analysis.write_summary_csv(rows, output_dir / "confidence_summary.csv")
+        markdown_path = reporting.write_markdown_report(run_job, rows, output_dir / "report.md")
         visualization.write_html_report(
             run_job,
             rows,
@@ -790,6 +751,13 @@ def _finalize_run_artifacts(
             language=language or run_job.get("language"),
         )
         temporary_destination.replace(destination)
+        status["artifacts"] = {
+            **dict(status.get("artifacts", {})),
+            "confidence_summary": str(summary_path),
+            "markdown_report": str(markdown_path),
+            "html_report": str(destination),
+        }
+        status["confidence_rows"] = len(rows)
     except Exception as exc:  # a report is non-critical; preserve the Boltz outcome
         try:
             temporary_destination.unlink(missing_ok=True)
@@ -801,7 +769,7 @@ def _finalize_run_artifacts(
             "path": str(destination),
             "error": str(exc),
             "run_status_unchanged": True,
-            "recovery": f"ppi-scout visualize {output_dir}",
+            "recovery": f"Inspect {output_dir / 'status.json'} and rerun the same command.",
         }
     else:
         status["visualization"] = {
@@ -842,7 +810,7 @@ def _print_run_visualization_status(status: Mapping[str, Any], translator: Trans
                 "auto_visualization_failed",
                 run_status=status.get("status", "unknown"),
                 error=visualization.get("error", "unknown error"),
-                recovery=visualization.get("recovery", "ppi-scout visualize RUN_DIR"),
+                recovery=visualization.get("recovery", "Inspect status.json and rerun the same command."),
             ),
             file=sys.stderr,
         )
@@ -862,6 +830,13 @@ def _command_run(args: argparse.Namespace, translator: Translator) -> int:
     if live_requested and dry_run_requested:
         raise CLIError("Choose either --live or --dry-run, not both.")
     job = _load_document(args.job)
+    routing = job.get("routing", {})
+    if (
+        isinstance(job.get("hypothesis"), dict)
+        and isinstance(routing, dict)
+        and routing.get("route") == "motif_peptide"
+    ):
+        return _command_run_panel(args, translator, job=job)
     proteins = job.get("inputs", {}).get("proteins", [])
     if len(proteins) < 2 or any(not item.get("sequence") for item in proteins):
         raise CLIError("The job needs at least two resolved protein sequences before it can run.")
@@ -938,22 +913,27 @@ def _command_run(args: argparse.Namespace, translator: Translator) -> int:
     return 0
 
 
-def _command_run_panel(args: argparse.Namespace, translator: Translator) -> int:
+def _command_run_panel(
+    args: argparse.Namespace,
+    translator: Translator,
+    *,
+    job: dict[str, Any] | None = None,
+) -> int:
     """Prepare, execute, resume, analyze, and report a matched peptide panel."""
 
     live_requested = bool(getattr(args, "live", False))
-    job = _load_document(args.job)
+    job = job or _load_document(args.job)
     proteins = job.get("inputs", {}).get("proteins", [])
     hypothesis = job.get("hypothesis")
     if not isinstance(hypothesis, dict):
-        raise CLIError("run-panel requires a reviewed job with a recorded motif hypothesis.")
+        raise CLIError("run requires a reviewed motif job with a recorded motif hypothesis.")
     motif_owner = str(hypothesis.get("motif_owner", "")).upper()
     owner = next(
         (item for item in proteins if str(item.get("id", "")).upper() == motif_owner),
         None,
     )
     if owner is None or not owner.get("sequence"):
-        raise CLIError("run-panel requires an exact sequence for the recorded motif owner.")
+        raise CLIError("run requires an exact sequence for the recorded motif owner.")
     windows = (
         _parse_windows(args.windows)
         if args.windows
@@ -973,7 +953,7 @@ def _command_run_panel(args: argparse.Namespace, translator: Translator) -> int:
             None,
         )
         if receptor is None or not receptor.get("sequence"):
-            raise CLIError("run-panel requires an exact receptor sequence for MSA lookup.")
+            raise CLIError("run requires an exact receptor sequence for MSA lookup.")
         try:
             msa_resolution = resolve_receptor_msa(
                 Path(args.msa_library),
@@ -1031,7 +1011,7 @@ def _command_run_panel(args: argparse.Namespace, translator: Translator) -> int:
             )
 
     output_dir = Path(
-        args.output_dir or f"runs/{_safe_job_slug(job.get('name'))}-panel"
+        args.output_dir or f"runs/{_safe_job_slug(job.get('name'))}"
     ).expanduser()
     try:
         tasks = executor_module.prepare_workspace(
@@ -1099,186 +1079,15 @@ def _command_run_panel(args: argparse.Namespace, translator: Translator) -> int:
         _print_run_visualization_status(status, translator)
         raise CLIError(str(exc)) from exc
 
-    try:
-        analysis = importlib.import_module("ppi_scout.analysis")
-        reporting = importlib.import_module("ppi_scout.reporting")
-        rows = analysis.collect_confidence_files(output_dir)
-        summary_path = analysis.write_summary_csv(rows, output_dir / "confidence_summary.csv")
-        report_path = reporting.write_markdown_report(run_job, rows, output_dir / "report.md")
-        status["artifacts"] = {
-            "panel": str(output_dir / "panel.json"),
-            "plan": str(output_dir / "plan.json"),
-            "confidence_summary": str(summary_path),
-            "markdown_report": str(report_path),
-        }
-        status["confidence_rows"] = len(rows)
-    except (ImportError, AttributeError, OSError, TypeError, ValueError) as exc:
-        status["analysis_warning"] = str(exc)
+    status["artifacts"] = {
+        "panel": str(output_dir / "panel.json"),
+        "plan": str(output_dir / "plan.json"),
+    }
     status["task_count"] = len(tasks)
     status["msa_mode"] = manifest["msa"]["mode"]
     status = _finalize_run_artifacts(output_dir, run_job, status, language=page_language)
     _print_run_visualization_status(status, translator)
     _emit(status, requested_format="json", output=None, translator=translator)
-    return 0
-
-
-def _command_resume(args: argparse.Namespace, translator: Translator) -> int:
-    run_path = Path(args.run_id).expanduser()
-    job_candidates = [run_path / "job.json", run_path / "resolved_job.json"]
-    job_path = next((path for path in job_candidates if path.is_file()), None)
-    if job_path is None:
-        raise CLIError("Resume expects a run directory containing job.json or resolved_job.json.")
-    stored_job = _load_document(str(job_path))
-    stored_execution = stored_job.get("execution", {})
-    namespace = argparse.Namespace(
-        job=str(job_path),
-        output_dir=str(run_path),
-        remote_msa=(
-            bool(stored_execution.get("remote_msa", False))
-            if args.remote_msa is None
-            else bool(args.remote_msa)
-        ),
-        output_format=args.output_format or stored_execution.get("output_format", "pdb"),
-        dry_run=args.dry_run,
-        live=args.live,
-        lang=args.lang,
-    )
-    return _command_run(namespace, translator)
-
-
-def _command_analyze(args: argparse.Namespace, translator: Translator) -> int:
-    root = Path(args.run_path).expanduser()
-    try:
-        module = importlib.import_module("ppi_scout.analysis")
-        rows = module.collect_confidence_files(root)
-        destination = Path(args.output).expanduser() if args.output else root / "confidence_summary.csv"
-        module.write_summary_csv(rows, destination)
-    except (ImportError, AttributeError) as exc:
-        raise CLIError(translator.t("core_unavailable")) from exc
-    _emit(
-        {"status": "complete", "rows": len(rows), "summary": str(destination)},
-        requested_format="json",
-        output=None,
-        translator=translator,
-    )
-    return 0
-
-
-def _command_report(args: argparse.Namespace, translator: Translator) -> int:
-    root = Path(args.run_path).expanduser()
-    job_path = Path(args.job).expanduser() if args.job else root / "job.json"
-    job = _load_document(str(job_path))
-    try:
-        analysis = importlib.import_module("ppi_scout.analysis")
-        reporting = importlib.import_module("ppi_scout.reporting")
-        rows = analysis.collect_confidence_files(root)
-        destination = Path(args.output).expanduser() if args.output else root / "report.md"
-        reporting.write_markdown_report(job, rows, destination)
-    except (ImportError, AttributeError) as exc:
-        raise CLIError(translator.t("core_unavailable")) from exc
-    _emit(
-        {"status": "complete", "report": str(destination)},
-        requested_format="json",
-        output=None,
-        translator=translator,
-    )
-    return 0
-
-
-def _command_visualize(args: argparse.Namespace, translator: Translator) -> int:
-    """Create a self-contained HTML view from a run directory or scan/job JSON."""
-
-    source = Path(args.source).expanduser()
-    if not source.exists():
-        raise CLIError(f"Visualization source does not exist: {source}")
-    try:
-        analysis = importlib.import_module("ppi_scout.analysis")
-        visualization = importlib.import_module("ppi_scout.visualization")
-    except (ImportError, AttributeError) as exc:
-        raise CLIError(translator.t("core_unavailable")) from exc
-
-    job: dict[str, Any] = {}
-    scan: dict[str, Any] = {}
-    status: dict[str, Any] = {}
-    rows: list[dict[str, Any]] = []
-    if source.is_dir():
-        job_path = next(
-            (path for path in (source / "job.json", source / "resolved_job.json") if path.is_file()),
-            None,
-        )
-        if job_path is not None:
-            job = _load_document(str(job_path))
-        status_path = source / "status.json"
-        if status_path.is_file():
-            status = _load_document(str(status_path))
-        rows = analysis.collect_confidence_files(source)
-        destination = Path(args.output).expanduser() if args.output else source / "report.html"
-    elif source.is_file():
-        payload = _load_document(str(source))
-        if payload.get("kind") == "aim_lir_scan":
-            scan = payload
-            job = {
-                "name": source.stem,
-                "language": args.lang or "en",
-                "execution": {"status": payload.get("status", "scan_complete")},
-            }
-        else:
-            job = payload
-            embedded_scan = payload.get("motif_scan")
-            if isinstance(embedded_scan, dict):
-                scan = embedded_scan
-        destination = (
-            Path(args.output).expanduser()
-            if args.output
-            else source.with_name(f"{source.stem}-report.html")
-        )
-    else:
-        raise CLIError(f"Unsupported visualization source: {source}")
-
-    if source.is_file() and destination.resolve() == source.resolve():
-        raise CLIError("The HTML output path must not replace the input JSON/job file.")
-
-    try:
-        visualization.write_html_report(
-            job,
-            rows,
-            destination,
-            scan=scan or None,
-            status=status or None,
-            language=args.lang or job.get("language"),
-        )
-    except (AttributeError, OSError, TypeError, ValueError) as exc:
-        raise CLIError(f"Could not create the local HTML result page: {exc}") from exc
-    _emit(
-        {
-            "status": "complete",
-            "visualization": str(destination),
-            "offline": True,
-            "next_step": translator.t("visualize_next_step"),
-        },
-        requested_format="json",
-        output=None,
-        translator=translator,
-    )
-    return 0
-
-
-def _command_import_legacy(args: argparse.Namespace, translator: Translator) -> int:
-    source = Path(args.source).expanduser()
-    if not source.exists():
-        raise CLIError(f"Legacy source does not exist: {source}")
-    destination = Path(args.output or f"{source.name}-import.json").expanduser()
-    manifest = {
-        "schema_version": "1.0",
-        "kind": "legacy_import",
-        "source": str(source.resolve()),
-        "status": "indexed",
-        "files": [str(path.relative_to(source)) for path in sorted(source.rglob("*")) if path.is_file()]
-        if source.is_dir()
-        else [source.name],
-        "warning": "Files were indexed but not copied or scientifically reinterpreted.",
-    }
-    _emit(manifest, requested_format="json", output=str(destination), translator=translator)
     return 0
 
 
@@ -1424,21 +1233,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_options(plan)
     plan.set_defaults(handler=_command_plan)
 
-    design = subparsers.add_parser("design-peptides", help="Design nested windows around a motif.")
-    design.add_argument("--sequence", help="Parent amino-acid sequence.")
-    design.add_argument("--fasta", help="Single-record parent FASTA file.")
-    design.add_argument(
-        "--motif",
-        help="Motif coordinates as 1-based inclusive START:END (for example 412:415).",
-    )
-    design.add_argument("--motif-sequence", help="Uniquely occurring motif sequence.")
-    design.add_argument("--windows", default="16,24,34", help="Comma-separated peptide lengths.")
-    design.add_argument("--seed", type=int, default=17, help="Deterministic decoy seed.")
-    _add_output_options(design)
-    design.set_defaults(handler=_command_design)
-
     scan = subparsers.add_parser(
-        "scan-motifs",
+        "scan",
         help="Scan a local sequence for AIM/LIR candidates without selecting one automatically.",
     )
     scan.add_argument("--sequence", help="Parent amino-acid sequence.")
@@ -1459,7 +1255,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_options(scan)
     scan.set_defaults(handler=_command_scan_motifs)
 
-    run = subparsers.add_parser("run", help="Compile and optionally execute a planned job.")
+    run = subparsers.add_parser(
+        "run",
+        help="Dry-run or execute a job; motif jobs automatically include matched controls.",
+    )
     run.add_argument("job", help="Job JSON/YAML path.")
     run.add_argument("--output-dir")
     execution_mode = run.add_mutually_exclusive_group()
@@ -1473,96 +1272,39 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Explicitly start the real Boltz prediction after reviewing the dry-run.",
     )
-    run.add_argument("--remote-msa", action="store_true", help="Explicitly authorize remote MSA use.")
-    run.add_argument("--output-format", choices=("pdb", "mmcif"), default="pdb")
-    run.set_defaults(handler=_command_run)
-
-    panel = subparsers.add_parser(
-        "run-panel",
-        help="Run and automatically resume a reviewed local motif-peptide control panel.",
-    )
-    panel.add_argument("job", help="Reviewed motif-peptide job JSON/YAML path.")
-    panel.add_argument("--output-dir")
-    panel_mode = panel.add_mutually_exclusive_group()
-    panel_mode.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Compile every panel task without executing Boltz (safe default).",
-    )
-    panel_mode.add_argument(
-        "--live",
-        action="store_true",
-        help="Explicitly execute every unfinished panel task and stream Boltz logs.",
-    )
-    panel.add_argument(
-        "--windows",
-        help="Comma-separated peptide lengths; defaults to 16,24,34 clamped to the parent.",
-    )
-    panel.add_argument("--design-seed", type=int, default=17)
-    panel.add_argument("--prediction-seed", type=int, default=17)
-    panel.add_argument("--scrambles", type=int, default=3, help="Composition-matched scrambles (minimum 3).")
-    msa_mode = panel.add_mutually_exclusive_group()
+    msa_mode = run.add_mutually_exclusive_group()
     msa_mode.add_argument(
         "--remote-msa",
         action="store_true",
-        help="Explicitly authorize sending protein sequences to the configured MSA service.",
+        help="Explicitly authorize sending protein sequences to a remote MSA service.",
     )
+    run.add_argument("--output-format", choices=("pdb", "mmcif"), default="pdb")
+    run.add_argument(
+        "--windows",
+        help="Motif jobs only: peptide lengths, for example 24 or 16,24,34.",
+    )
+    run.add_argument("--design-seed", type=int, default=17, help=argparse.SUPPRESS)
+    run.add_argument("--prediction-seed", type=int, default=17, help=argparse.SUPPRESS)
+    run.add_argument("--scrambles", type=int, default=3, help=argparse.SUPPRESS)
     msa_mode.add_argument(
         "--receptor-msa",
-        help="Audited local/precomputed receptor MSA path; peptides remain msa: empty.",
+        help="Motif jobs only: audited local receptor MSA; peptides remain msa: empty.",
     )
     msa_mode.add_argument(
         "--msa-library",
-        help=(
-            "Offline A3M directory addressed by exact receptor sequence SHA-256; "
-            "falls back to msa: empty when no exact match exists."
-        ),
+        help="Motif jobs only: exact-sequence local A3M directory.",
     )
-    panel.add_argument("--output-format", choices=("pdb", "mmcif"), default="pdb")
-    panel.add_argument("--accelerator", choices=("auto", "gpu", "cpu", "tpu"), default="auto")
-    panel.add_argument(
+    run.add_argument("--accelerator", choices=("auto", "gpu", "cpu", "tpu"), default="auto")
+    run.add_argument(
         "--kernels",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Enable or disable specialized kernels; Apple Silicon auto-disables them.",
+        help=argparse.SUPPRESS,
     )
-    panel.add_argument("--recycling-steps", type=int, default=3)
-    panel.add_argument("--sampling-steps", type=int, default=200)
-    panel.add_argument("--diffusion-samples", type=int, default=1)
-    panel.set_defaults(handler=_command_run_panel)
-
-    resume = subparsers.add_parser("resume", help="Resume a run directory using its resolved job.")
-    resume.add_argument("run_id", help="Run directory path.")
-    resume_mode = resume.add_mutually_exclusive_group()
-    resume_mode.add_argument("--dry-run", action="store_true", help="Inspect the resumed command only (default).")
-    resume_mode.add_argument("--live", action="store_true", help="Explicitly restart the real prediction.")
-    resume.add_argument("--remote-msa", action=argparse.BooleanOptionalAction, default=None)
-    resume.add_argument("--output-format", choices=("pdb", "mmcif"), default=None)
-    resume.set_defaults(handler=_command_resume)
-
-    analyze = subparsers.add_parser("analyze", help="Collect confidence fields from a run.")
-    analyze.add_argument("run_path")
-    analyze.add_argument("-o", "--output", help="Summary CSV path.")
-    analyze.set_defaults(handler=_command_analyze)
-
-    report = subparsers.add_parser("report", help="Generate a conservative Markdown report.")
-    report.add_argument("run_path")
-    report.add_argument("--job", help="Job file path; defaults to RUN_PATH/job.json.")
-    report.add_argument("-o", "--output", help="Markdown report path.")
-    report.set_defaults(handler=_command_report)
-
-    visualize = subparsers.add_parser(
-        "visualize",
-        help="Create an offline HTML result page from a run directory or scan/job JSON.",
-    )
-    visualize.add_argument("source", help="Run directory, scan JSON, or job JSON to visualize.")
-    visualize.add_argument("-o", "--output", help="HTML output path; defaults beside the source.")
-    visualize.set_defaults(handler=_command_visualize)
-
-    legacy = subparsers.add_parser("import-legacy", help="Index an existing result folder without modifying it.")
-    legacy.add_argument("source")
-    legacy.add_argument("-o", "--output", help="Import manifest path.")
-    legacy.set_defaults(handler=_command_import_legacy)
+    run.add_argument("--recycling-steps", type=int, default=3, help=argparse.SUPPRESS)
+    run.add_argument("--sampling-steps", type=int, default=200, help=argparse.SUPPRESS)
+    run.add_argument("--diffusion-samples", type=int, default=1, help=argparse.SUPPRESS)
+    run.set_defaults(handler=_command_run)
 
     return parser
 

@@ -1,15 +1,16 @@
 #!/bin/zsh
+# PPI Scout offline launcher for Apple Silicon.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-VERSION="0.4.0"
+VERSION="0.5.0"
 STATE_ROOT="${PPI_SCOUT_STATE_ROOT:-$HOME/Library/Application Support/PPI-Scout-Offline/$VERSION}"
 RUNTIME_ARCHIVE="$ROOT/macos-arm64/ppi-scout-runtime-macos-arm64.tar.gz"
 RUNTIME_ROOT="$STATE_ROOT/runtime"
 CACHE_ROOT="$STATE_ROOT/boltz-cache"
 JOB="$ROOT/jobs/current-job.json"
 MSA_LIBRARY="$ROOT/msas"
-RESULT_ROOT="$ROOT/results/atg8-yta7-fdfl"
+RESULT_ROOT="$ROOT/results/atg8-yta7"
 
 fail() {
   print -u2 "\n错误：$1"
@@ -67,7 +68,7 @@ mkdir -p "$RESULT_ROOT"
 BOLTZ_CACHE="$CACHE_ROOT" \
   "$PYTHON" -m ppi_scout.offline \
   --lang zh-CN \
-  run-panel "$JOB" \
+  run "$JOB" \
   --windows 24 \
   --design-seed 7 \
   --msa-library "$MSA_LIBRARY" \

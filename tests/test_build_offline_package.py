@@ -6,10 +6,10 @@ from types import SimpleNamespace
 import unittest
 import zipfile
 
-from scripts.prepare_offline_release import prepare, sha256, split_asset
+from scripts.build_offline_package import prepare, prepare_windows_artifact, sha256, split_asset
 
 
-class PrepareOfflineReleaseTests(unittest.TestCase):
+class BuildOfflinePackageTests(unittest.TestCase):
     def test_split_asset_is_ordered_and_reconstructable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_value:
             root = Path(tmp_value)
@@ -36,6 +36,7 @@ class PrepareOfflineReleaseTests(unittest.TestCase):
                 "Run-PPI-Scout-Windows.cmd",
                 "README.md",
                 "BUNDLE-SHA256SUMS",
+                "BUNDLE-SOURCES.txt",
                 "jobs/current-job.json",
                 "msas/README.md",
                 "models/SHA256SUMS",
@@ -74,6 +75,53 @@ class PrepareOfflineReleaseTests(unittest.TestCase):
                 script = archive.read("Online-Setup-and-Run-macOS.command").decode()
             self.assertIn("offline-test", script)
             self.assertIn("models/boltz2_conf.ckpt", script)
+
+    def test_prepare_windows_artifact_uses_only_local_parts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_value:
+            root = Path(tmp_value)
+            bundle = root / "bundle"
+            output = root / "windows-artifact"
+            files = (
+                "Run-PPI-Scout-Windows.cmd",
+                "README.md",
+                "BUNDLE-SHA256SUMS",
+                "BUNDLE-SOURCES.txt",
+                "jobs/current-job.json",
+                "msas/README.md",
+                "models/SHA256SUMS",
+                "models/mols.tar",
+                "models/boltz2_conf.ckpt",
+                "models/boltz2_aff.ckpt",
+                "windows-wsl2-x64/ppi-scout-runtime-linux-x86_64.tar.gz",
+                "windows-wsl2-x64/ubuntu-rootfs.tar.gz",
+                "windows-wsl2-x64/install-and-run.ps1",
+                "windows-wsl2-x64/install-and-run.sh",
+            )
+            for index, relative in enumerate(files):
+                path = bundle / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes((f"payload-{index}-" * 3).encode())
+
+            prepare_windows_artifact(bundle, output, "v0.5.0-test", chunk_size=17)
+
+            setup = (output / "setup.ps1").read_text(encoding="utf-8-sig")
+            self.assertNotIn("https://", setup)
+            self.assertIn("models/boltz2_conf.ckpt", setup)
+            self.assertIn("windows-wsl2-x64/ubuntu-rootfs.tar.gz", setup)
+            self.assertTrue((output / "双击这里安装并运行.cmd").is_file())
+            self.assertTrue((output / "README-FIRST-请先看.txt").is_file())
+            online_zip = output / "PPI-Scout-Windows-Installer-v0.5.0-test.zip"
+            self.assertTrue(online_zip.is_file())
+            with zipfile.ZipFile(online_zip) as archive:
+                online_setup = archive.read("setup.ps1").decode("utf-8-sig")
+                self.assertIn(
+                    "https://github.com/ZHULUYI-KyushuU/ppi-scout/releases/download/v0.5.0-test",
+                    online_setup,
+                )
+                self.assertIn("双击这里下载并安装.cmd", archive.namelist())
+            checksums = (output / "artifact-files.sha256").read_text()
+            self.assertIn("setup.ps1", checksums)
+            self.assertIn(online_zip.name, checksums)
 
 
 if __name__ == "__main__":
