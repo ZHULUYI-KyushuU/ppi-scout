@@ -5,9 +5,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "offline/**"
+      - "scripts/build_offline_package.py"
+      - "examples/atg8-yta7-job.json"
+      - "src/**"
+      - "pyproject.toml"
   pull_request:
     paths:
-      - ".github/workflows/build-offline-runtimes.yml"
       - "offline/**"
       - "scripts/build_offline_package.py"
       - "examples/atg8-yta7-job.json"
@@ -217,9 +222,13 @@ jobs:
               --draft \
               --target "$GITHUB_SHA" \
               --title "PPI Scout $TAG" \
-              --notes "Windows 新手请下载 PPI-Scout-Windows-Installer-$TAG.zip，解压后双击中文安装文件。第一次需要联网下载并校验约 10.4 GB；安装完成后的预测可以离线运行。"
+              --notes-file ".github/release-notes/${TAG}.md"
           fi
           gh release upload "$TAG" \
             dist/PPI-Scout-Windows-Offline-v${PPI_SCOUT_VERSION}/* \
             --clobber
-          gh release edit "$TAG" --draft=false --latest
+          gh release edit "$TAG" \
+            --title "PPI Scout $TAG" \
+            --notes-file ".github/release-notes/${TAG}.md" \
+            --draft=false \
+            --latest

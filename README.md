@@ -13,7 +13,7 @@ controls, resumes unfinished work, and writes a local result page.
 
 Open [Releases](https://github.com/ZHULUYI-KyushuU/ppi-scout/releases/latest),
 download `PPI-Scout-Windows-Installer-v0.5.0.zip`, extract it, and double-click
-`双击这里下载并安装.cmd`. The first setup downloads and verifies about 10.4 GB;
+`Download-Install-and-Run.cmd`. The first setup downloads and verifies about 10.4 GB;
 later predictions can run without internet access.
 
 The offline package already contains Python, PPI Scout, Boltz, model files, and
