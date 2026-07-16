@@ -1,0 +1,31 @@
+name: Update release metadata
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/release-notes/v0.5.0.md"
+      - ".github/workflows/update-release-metadata.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update-v0-5-0:
+    name: Apply English v0.5.0 release notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit v0.5.0 \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "PPI Scout v0.5.0" \
+            --notes-file .github/release-notes/v0.5.0.md \
+            --draft=false \
+            --prerelease=false \
+            --latest
